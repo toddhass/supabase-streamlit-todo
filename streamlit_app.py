@@ -43,15 +43,14 @@ with st.sidebar:
             with st.form("signup_form"):
                 email = st.text_input("Email", key="su_email")
                 password = st.text_input("Password", type="password", key="su_pass")
-                if st.form_submit_button("Create Account")
-                if st.form_submit_button("Sign Up"):
+                if st.form_submit_button("Sign Up"):  # ← THIS LINE WAS BROKEN BEFORE
                     with st.spinner("Creating account..."):
                         try:
                             supabase.auth.sign_up({"email": email, "password": password})
-                            st.success("Check your email to confirm!")
+                            st.success("Check your email to confirm account!")
                             st.balloons()
                         except Exception as e:
-                            st.error(str(e))
+                            st.error(f"Error: {str(e)}")
     else:
         st.success(f"Hi {user.email.split('@')[0]}!")
         if st.button("Log Out", type="primary"):
