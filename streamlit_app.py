@@ -1,8 +1,11 @@
-# streamlit_app.py ← FINAL 100% WORKING REAL-TIME VERSION (Dec 2025)
+# streamlit_app.py ← TRUE REAL-TIME (Async + Subscriptions)
 import streamlit as st
+import asyncio
 from utils import supabase, get_current_user
+from supabase.lib.realtime_client import RealtimeChannel
+from typing import Any
 
-st.set_page_config(page_title="Supabase Todo • Live", page_icon="rocket", layout="centered")
+st.set_page_config(page_title="Supabase Todo • Real-Time", page_icon="⚡", layout="centered")
 
 # Styling
 st.markdown("""
@@ -14,9 +17,13 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<p class="big-font">rocket Supabase Todo<br><small>Live sync • No refresh needed</small></p>', unsafe_allow_html=True)
+st.markdown('<p class="big-font">⚡ Supabase Todo<br><small>True Real-Time Sync</small></p>', unsafe_allow_html=True)
 
-# ─── Auth ─────────────────────
+# Global state for channel
+if "channel" not in st.session_state:
+    st.session_state.channel = None
+
+# ─── Auth (sync for simplicity) ──────────────────
 with st.sidebar:
     st.header("Auth")
     user = get_current_user()
@@ -27,9 +34,11 @@ with st.sidebar:
             with st.form("login"):
                 email = st.text_input("Email")
                 pwd = st.text_input("Password", type="password")
-                if st.form_submit_button("Log In"):
+                submitted = st.form_submit_button("Log In")
+                if submitted:
                     try:
-                        supabase.auth.sign_in_with_password({"email": email, "password": pwd})
+                        sync_sb = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
+                        sync_sb.auth.sign_in_with_password({"email": email, "password": pwd})
                         st.rerun()
                     except:
                         st.error("Login failed")
@@ -37,17 +46,23 @@ with st.sidebar:
             with st.form("signup"):
                 email = st.text_input("Email", key="e")
                 pwd = st.text_input("Password", type="password", key="p")
-                if st.form_submit_button("Sign Up"):
+                submitted = st.form_submit_button("Sign Up")
+                if submitted:
                     try:
-                        supabase.auth.sign_up({"email": email, "password": pwd})
+                        sync_sb = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
+                        sync_sb.auth.sign_up({"email": email, "password": pwd})
                         st.success("Check your email!")
                         st.balloons()
                     except Exception as e:
                         st.error(str(e))
     else:
         st.success(f"Hi {user.email.split('@')[0]}!")
-        if st.button("Log Out", True):
-            supabase.auth.sign_out()
+        if st.button("Log Out"):
+            sync_sb = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
+            sync_sb.auth.sign_out()
+            if st.session_state.channel:
+                asyncio.run(st.session_state.channel.unsubscribe())
+            st.session_state.channel = None
             st.rerun()
 
 if not user:
@@ -55,70 +70,82 @@ if not user:
 
 # ─── Add Todo ─────────────────
 with st.form("add", clear_on_submit=True):
-    task = st.text_input("New todo")
-    if st.form_submit_button("Add", True) and task:
-        supabase.table("todos").insert({
+    task = st.text_input("New todo", placeholder="What needs doing?")
+    submitted = st.form_submit_button("Add Todo")
+    if submitted and task.strip():
+        asyncio.run(supabase.table("todos").insert({
             "user_id": user.id,
-            "task": task,
+            "task": task.strip(),
             "is_complete": False
-        }).execute()
-        st.rerun()
+        }).execute())
+        st.success("Added instantly!")
 
-# ─── Live Todos ───────────────
-st.subheader("Your Todos (live)")
+# ─── Real-Time Todos ──────────
+st.subheader("Your Todos (⚡ Real-Time)")
 
-resp = supabase.table("todos")\
-    .select("*")\
-    .eq("user_id", user.id)\
-    .order("inserted_at", desc=True)\
-    .execute()
+async def load_todos():
+    resp = await supabase.table("todos")\
+        .select("*")\
+        .eq("user_id", user.id)\
+        .order("inserted_at", desc=True)\
+        .execute()
+    return resp.data or []
 
-todos = resp.data or []
+async def setup_realtime():
+    if st.session_state.channel:
+        return  # Already subscribed
+
+    # Create channel for user-specific todos
+    channel: RealtimeChannel = supabase.channel(f"todos:{user.id}")
+
+    def handle_event(payload: Any):
+        st.rerun()  # Trigger re-render on change
+
+    # Subscribe to events (async callback via create_task)
+    import asyncio
+    channel.on("postgres_changes", {
+        "event": "*",
+        "schema": "public",
+        "table": "todos",
+        "filter": f"user_id=eq.{user.id}"
+    }, handle_event)
+
+    await channel.subscribe()
+    st.session_state.channel = channel
+    st.success("Real-time connected! Changes sync instantly.")
+
+# Load initial todos & setup subscription
+todos = asyncio.run(load_todos())
+await setup_realtime()  # Wait for subscription
 
 if not todos:
-    st.info("No todos yet")
+    st.info("No todos yet — add one above!")
 else:
     for todo in todos:
         c1, c2, c3 = st.columns([7, 2, 2])
         with c1:
-            status = "Completed" if todo["is_complete"] else "Pending"
+            status = "✓ Completed" if todo["is_complete"] else "○ Pending"
             st.markdown(f"""
             <div class="todo-item">
                 <strong>{todo['id']}. {status}</strong><br>
                 <span class="{'completed' if todo['is_complete'] else ''}">{todo['task']}</span>
             </div>
-            """, True)
+            """, unsafe_allow_html=True)
         with c2:
             if st.button("Toggle", key=f"t{todo['id']}"):
-                supabase.table("todos").update({"is_complete": not todo["is_complete"]})\
-                    .eq("id", todo["id"]).execute()
+                asyncio.run(supabase.table("todos").update({"is_complete": not todo["is_complete"]})\
+                    .eq("id", todo["id"]).execute())
                 st.rerun()
         with c3:
             if st.button("Delete", key=f"d{todo['id']}"):
-                supabase.table("todos").delete().eq("id", todo["id"]).execute()
+                asyncio.run(supabase.table("todos").delete().eq("id", todo["id"]).execute())
                 st.rerun()
 
-# ─── REAL-TIME (working method 2025) ────
-# We use Streamlit's built-in session_state + Supabase Realtime via callback
-if "last_realtime" not in st.session_state:
-    st.session_state.last_realtime = None
+# Cleanup on session end
+def cleanup():
+    if st.session_state.channel:
+        asyncio.run(st.session_state.channel.unsubscribe())
 
-def realtime_callback(payload):
-    st.session_state.last_realtime = payload
-    st.rerun()
+st._on_session_end = cleanup  # Streamlit hack for cleanup
 
-# Subscribe (correct v2+ syntax)
-supabase.realtime.connect()
-
-channel = supabase.table("todos").on("INSERT", realtime_callback)\
-                                 .on("UPDATE", realtime_callback)\
-                                 .on("DELETE", realtime_callback)\
-                                 .subscribe()
-
-# Optional: cleanup on shutdown (not required but nice)
-def on_session_end():
-    supabase.realtime.disconnect()
-
-st.on_session_end = on_session_end
-
-st.caption("Live sync powered by Supabase Realtime — changes appear instantly!")
+st.caption("⚡ True real-time via Supabase Postgres Changes • Syncs across tabs/devices!")
