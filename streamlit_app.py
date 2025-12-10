@@ -74,7 +74,7 @@ with st.form("add_todo", clear_on_submit=True):
     if st.form_submit_button("Add Todo") and task.strip():
         try:
             supabase.table("todos").insert({
-                "owner_id": user.id,  # Matches your table
+                "user": user.id,  # Matches your table
                 "task": task.strip(),
                 "is_complete": False
             }).execute()
@@ -88,7 +88,7 @@ st.header("Your Todos")
 try:
     resp = supabase.table("todos")\
         .select("*")\
-        .eq("owner_id", user.id)\
+        .eq("user_id", user.id)\
         .order("inserted_at", desc=True)\
         .execute()
 
