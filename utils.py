@@ -4,7 +4,7 @@ import nest_asyncio
 from supabase import create_client, acreate_client, Client
 import asyncio
 
-nest_asyncio.apply()  # Allows async in Streamlit
+nest_asyncio.apply()  # Fixes async in Streamlit
 
 @st.cache_resource
 def get_sync_client() -> Client:
