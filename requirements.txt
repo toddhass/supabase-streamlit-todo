@@ -1,3 +1,2 @@
-streamlit>=1.32
-supabase>=2.4.0
-python-dotenv
+streamlit
+supabase==2.7.4
