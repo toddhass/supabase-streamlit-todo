@@ -1,4 +1,4 @@
-# streamlit_app.py  ← REAL-TIME VERSION
+# streamlit_app.py ← FINAL WORKING REAL-TIME VERSION
 import streamlit as st
 from utils import supabase, get_current_user
 
@@ -24,90 +24,95 @@ with st.sidebar:
 
     if not user:
         tab1, tab2 = st.tabs(["Login", "Sign Up"])
+
         with tab1:
             with st.form("login"):
                 email = st.text_input("Email")
                 pwd = st.text_input("Password", type="password")
                 if st.form_submit_button("Log In"):
-                    supabase.auth.sign_in_with_password({"email": email, "password": pwd})
-                    st.rerun()
+                    with st.spinner("Logging in..."):
+                        try:
+                            supabase.auth.sign_in_with_password({"email": email, "password": pwd})
+                            st.rerun()
+                        except:
+                            st.error("Wrong credentials")
+
         with tab2:
             with st.form("signup"):
                 email = st.text_input("Email", key="new_mail")
                 pwd = st.text_input("Password", type="password", key="new_pwd")
                 if st.form_submit_button("Sign Up"):
-                    supabase.auth.sign_up({"email": email, "password": pwd})
-                    st.success("Check your email to confirm!")
-                    st.balloons()
+                    with st.spinner("Creating account..."):
+                        try:
+                            supabase.auth.sign_up({"email": email, "password": pwd})
+                            st.success("Check your email to confirm!")
+                            st.balloons()
+                        except Exception as e:
+                            st.error(str(e))
     else:
         st.success(f"Hey {user.email.split('@')[0]}!")
         if st.button("Log Out", type="primary"):
             supabase.auth.sign_out()
             st.rerun()
 
-# ─── Must be logged in ──────────────────────────
+# ─── Logged-in only ─────────────────────────────
 if not user:
-    st.info("Log in or sign up to use real-time todos")
+    st.info("Please log in or sign up")
     st.stop()
 
-# ─── REAL-TIME MAGIC STARTS HERE ─────────────────
-# Create a placeholder that will auto-update
-todo_container = st.empty()
+# ─── Add Todo ───────────────────────────────────
+with st.form("add_form", clear_on_submit=True):
+    new_task = st.text_area("Add a new todo")
+    if st.form_submit_button("Add Todo", type="primary") and new_task:
+        supabase.table("todos").insert({
+            "user_id": user.id,
+            "task": new_task,
+            "is_complete": False
+        }).execute()
 
-with todo_container.container():
-    st.subheader("Your Todos (real-time)")
+# ─── Show Todos (real-time) Todos ──────────────────
+st.subheader("Your Todos (live)")
 
-    # Initial fetch
-    resp = supabase.table("todos")\
-        .select("*")\
-        .eq("user_id", user.id)\
-        .order("inserted_at", desc=True)\
-        .execute()
+response = supabase.table("todos")\
+    .select("*")\
+    .eq("user_id", user.id)\
+    .order("inserted_at", desc=True)\
+    .execute()
 
-    todos = resp.data
+todos = response.data
 
-    # Add new todo form (outside container so it stays on top)
-    with st.form("add_form", clear_on_submit=True):
-        new_task = st.text_area("Add a new todo", placeholder="What needs doing?")
-        if st.form_submit_button("Add", type="primary") and new_task.strip():
-            supabase.table("todos").insert({
-                "user_id": user.id,
-                "task": new_task.strip(),
-                "is_complete": False
-            }).execute()
+if not todos:
+    st.info("No todos yet — add one above!")
+else:
+    for todo in todos:
+        col1, col2, col3 = st.columns([7, 2, 2])
+        with col1:
+            status = "Completed" if todo["is_complete"] else "Pending"
+            st.markdown(f"""
+            <div class="todo-item">
+                <strong>{todo['id']}. {status}</strong><br>
+                <span class="{'completed' if todo['is_complete'] else ''}">{todo['task']}</span>
+            </div>
+            """, unsafe_allow_html=True)
+        with col2:
+            if st.button("Toggle", key=f"toggle_{todo['id']}"):
+                supabase.table("todos").update({"is_complete": not todo["is_complete"]})\
+                    .eq("id", todo["id"]).execute()
+                st.rerun()
+        with col3:
+            if st.button("Delete", key=f"del_{todo['id']}", type="secondary"):
+                supabase.table("todos").delete().eq("id", todo["id"]).execute()
+                st.rerun()
 
-    # Display todos
-    Display current list
-    if not todos:
-        st.info("No todos yet — add one!")
-    else:
-        for todo in todos:
-            c1, c2, c3 = st.columns([7, 2, 2])
-            with c1:
-                status = "Completed" if todo["is_complete"] else "Pending"
-                st.markdown(f"""
-                <div class="todo-item">
-                    <strong>{todo['id']}. {status}</strong><br>
-                    <span class="{'completed' if todo['is_complete'] else ''}">{todo['task']}</span>
-                </div>
-                """, unsafe_allow_html=True)
-            with c2:
-                if st.button("Toggle", key=f"t_{todo['id']}"):
-                    supabase.table("todos").update({"is_complete": not todo["is_complete"]})\
-                        .eq("id", todo["id"]).execute()
-            with c3:
-                if st.button("Delete", key=f"d_{todo['id']}", type="secondary"):
-                    supabase.table("todos").delete().eq("id", todo["id"]).execute()
-
-# ─── REAL-TIME SUBSCRIPTION (the magic line) ─────
-def on_realtime(payload):
-    st.rerun()   # This refreshes the whole page instantly when anything changes
+# ─── REAL-TIME SUBSCRIPTION ─────────────────────
+def on_change(payload):
+    st.rerun()
 
 supabase.table("todos")\
-    .on("INSERT", on_realtime)\
-    .on("UPDATE", on_realtime)\
-    .on("DELETE", on_realtime)\
+    .on("INSERT", on_change)\
+    .on("UPDATE", on_change)\
+    .on("DELETE", on_change)\
     .subscribe()
 
 # ─── Footer ─────────────────────────────────────
-st.caption("Real-time powered by Supabase Realtime • Changes appear instantly across tabs & devices!")
+st.caption("Real-time powered by Supabase • Changes appear instantly across all your devices!")
