@@ -1,18 +1,26 @@
 # utils.py
-import os
 import streamlit as st
-from supabase import create_client, Client
-from dotenv import load_dotenv
+import nest_asyncio
+from supabase import create_client, acreate_client, Client
+import asyncio
 
-load_dotenv()
+nest_asyncio.apply()  # Allows async in Streamlit
 
 @st.cache_resource
-def get_supabase() -> Client:
-    url = st.secrets.get("SUPABASE_URL") or os.getenv("SUPABASE_URL")
-    key = st.secrets.get("SUPABASE_KEY") or os.getenv("SUPABASE_KEY")
-    if not url or not key:
-        st.error("Missing Supabase credentials")
-        st.stop()
-    return create_client(url, key)
+def get_sync_client() -> Client:
+    return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 
-supabase: Client = get_supabase()
+@st.cache_resource
+def get_async_client():
+    loop = asyncio.get_event_loop()
+    return loop.run_until_complete(acreate_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"]))
+
+supabase = get_sync_client()
+async_supabase = get_async_client()
+
+def get_current_user():
+    try:
+        session = supabase.auth.get_session()
+        return session.user if session and session.user else None
+    except:
+        return None
