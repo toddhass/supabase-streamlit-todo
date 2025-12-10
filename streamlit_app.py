@@ -23,7 +23,7 @@ if "realtime_setup" not in st.session_state:
     st.session_state.realtime_setup = False
 
 # Sidebar Auth
-user = get_current_user()
+ = get_current_()
 
 with st.sidebar:
     st.header("Auth")
@@ -74,7 +74,7 @@ with st.form("add_todo", clear_on_submit=True):
     if st.form_submit_button("Add Todo") and task.strip():
         try:
             supabase.table("todos").insert({
-                "user": user.id,  # Matches your table
+                "user_id": user.id,  # Matches your table
                 "task": task.strip(),
                 "is_complete": False
             }).execute()
