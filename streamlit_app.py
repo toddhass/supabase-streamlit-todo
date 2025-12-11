@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL, API-COMPATIBLE VERSION (Indentation Fix)
+# streamlit_app.py ← FINAL, V1 SYNTAX FIX
 import streamlit as st
 from supabase import create_client
 
@@ -10,7 +10,7 @@ def get_supabase():
 
 supabase = get_supabase()
 
-# 🛑 FINAL FIX: Corrected Indentation for chained methods 🛑
+# 🛑 FINAL FIX: Corrected V1 API arguments for .order() 🛑
 def load_todos(_user_id, status_filter):
     """Loads todos for the current user, applying filter and atomic sorting."""
     
@@ -23,15 +23,15 @@ def load_todos(_user_id, status_filter):
         
     # 3. Apply Sorting and Execute as a Single Chained Operation
     try:
-        # Indentation corrected here
+        # FIX: Use the simple string syntax 'column.direction' (e.g., 'id.desc')
         return base_query \
-            .order("is_complete", descending=False) \
-            .order("id", descending=True) \
+            .order('is_complete.asc') \
+            .order('id.desc') \
             .execute().data
             
     except Exception as e:
         # A defensive return to prevent the app from crashing entirely
-        st.error(f"Failed to load todos (Check Supabase version/connection): {e}")
+        st.error(f"Failed to load todos (Final attempt error: {e})")
         return []
 
 
