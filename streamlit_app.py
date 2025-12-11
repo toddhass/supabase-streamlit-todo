@@ -79,22 +79,22 @@ def render_todo_item(todo):
     with st.container(border=False):
         st.markdown(f'<div class="{wrapper_class}">', unsafe_allow_html=True)
 
-        # Column structure (Adjusted for label before checkbox)
-        c_label, c_checkbox, c_task, c_remove = st.columns([1.5, 0.5, 7, 1])  # Added column for label
+        # Column structure (Adjusted for inline label and checkbox)
+        c_status, c_task, c_remove = st.columns([3, 7, 1])  # Adjusted ratios
         
-        with c_label:
-            st.markdown("Completed:", unsafe_allow_html=True)
-        
-        with c_checkbox:
-            # Checkbox with tooltip
-            st.checkbox(
-                label="",
-                value=completed,
-                key=f"checkbox_{todo['id']}",
-                on_change=update_todo_status,
-                args=(todo["id"], not completed),
-                help="Mark as completed"
-            )
+        with c_status:
+            sub_label, sub_checkbox = st.columns([2, 1])
+            with sub_label:
+                st.markdown("Completed:", unsafe_allow_html=True)
+            with sub_checkbox:
+                st.checkbox(
+                    label="",
+                    value=completed,
+                    key=f"checkbox_{todo['id']}",
+                    on_change=update_todo_status,
+                    args=(todo["id"], not completed),
+                    help="Mark as completed"  # Tooltip
+                )
 
         with c_task:
             # Task Text
@@ -224,6 +224,11 @@ st.markdown("""
     .logged-in-email {
         font-weight: 600;
         color: var(--primary-color);
+    }
+
+    /* Additional CSS for inline alignment */
+    div[data-testid="column"] > div > div > p {
+        margin-bottom: 0;  /* Reduce margin for label */
     }
 
 </style>
