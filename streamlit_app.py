@@ -116,7 +116,7 @@ def render_todo_item(todo):
 # --- Page Setup (Updated to Wide Layout) ---
 st.set_page_config(page_title="My Todos", page_icon="📝", layout="wide")
 
-# --- 💅 Custom CSS (Refined for Better Spacing and Typography) ---
+# --- 💅 Custom CSS (Refined for Better Spacing and Typography, with Media Queries) ---
 st.markdown("""
 <style>
     :root {
@@ -229,6 +229,31 @@ st.markdown("""
     /* Additional CSS for inline alignment */
     div[data-testid="column"] > div > div > p {
         margin-bottom: 0;  /* Reduce margin for label */
+    }
+
+    /* Media query for desktop screens (min-width: 1024px) */
+    @media (min-width: 1024px) {
+        div.stApp {
+            max-width: 1200px;  /* Limit overall app width to avoid excessive stretching */
+            margin: 0 auto;     /* Center the content horizontally */
+        }
+        .task-text {
+            font-size: 1.2rem;  /* Slightly larger text for readability on big screens */
+        }
+        div[data-testid="stHorizontalBlock"] {
+            gap: 1rem;  /* Add spacing between columns for better visual separation */
+        }
+        /* Reduce card padding to fit more content comfortably */
+        div[data-testid="stVerticalBlock"] > div:has([data-testid="stHorizontalBlock"]) > div:not(.header-row) {
+            padding: 0.75rem 1rem;
+        }
+    }
+
+    /* Media query for tablets (min-width: 768px and max-width: 1023px) */
+    @media (min-width: 768px) and (max-width: 1023px) {
+        .task-text {
+            font-size: 1.05rem;
+        }
     }
 
 </style>
