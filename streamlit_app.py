@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL, MODERNIZED, USER-FRIENDLY, AND CORRECTLY BEHAVED VERSION
+# streamlit_app.py ← FINAL, FIXED, AND CORRECTLY BEHAVED VERSION
 import streamlit as st
 from supabase import create_client
 import time
@@ -6,10 +6,35 @@ import time
 # --- Supabase Client ---
 @st.cache_resource
 def get_supabase():
-    # Ensure SUPABASE_URL and SUPABASE_KEY are in your .streamlit/secrets.toml
     return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 
 supabase = get_supabase()
+
+# --- CALLBACK FUNCTION FOR ADDING TODO ---
+def add_todo_callback():
+    """Handles todo insertion and clears the input field state."""
+    # Ensure user is logged in before proceeding
+    if "user" not in st.session_state or not st.session_state.user:
+        return
+
+    task_to_add = st.session_state.task_input
+    
+    if task_to_add.strip():
+        # 1. Insert the todo
+        supabase.table("todos").insert({
+            "user_id": st.session_state.user.id,
+            "task": task_to_add.strip(),
+            "is_complete": False
+        }).execute()
+
+        # 2. Clear the input field's state (SAFE INSIDE CALLBACK)
+        st.session_state.task_input = "" 
+        
+        # 3. Clear the cache (A rerun will automatically follow this callback)
+        st.cache_data.clear()
+    else:
+        # Optional: You could show a transient error message here if needed
+        pass
 
 # --- Page Setup ---
 st.set_page_config(page_title="My Todos", page_icon="📝", layout="centered")
@@ -159,7 +184,7 @@ def load_todos(_user_id):
 
 todos = load_todos(user.id)
 
-# --- Add Todo (Integrated Input) ---
+# --- Add Todo (Integrated Input with Callback) ---
 st.markdown("### Add a new todo")
 
 # Initialize the state key for task input
@@ -170,7 +195,8 @@ with st.container():
     col_input, col_btn = st.columns([5, 1])
     
     with col_input:
-        task = st.text_input(
+        # Input field is linked to st.session_state.task_input via key
+        st.text_input(
             "What needs to be done?", 
             placeholder="e.g., Deploy modern UI changes", 
             label_visibility="collapsed", 
@@ -178,22 +204,13 @@ with st.container():
         )
     
     with col_btn:
-        if st.button("Add", type="primary", use_container_width=True):
-            if task.strip():
-                # INSERT LOGIC
-                supabase.table("todos").insert({
-                    "user_id": user.id,
-                    "task": task.strip(),
-                    "is_complete": False
-                }).execute()
-                
-                # --- FIX: Manually clear the input field's state ---
-                st.session_state.task_input = "" 
-                
-                st.cache_data.clear()
-                st.rerun()
-            else:
-                 st.error("Task cannot be empty.")
+        # Use the callback function to safely submit and clear the input
+        st.button(
+            "Add", 
+            type="primary", 
+            use_container_width=True,
+            on_click=add_todo_callback # <-- THE SAFE WAY TO RESET STATE
+        )
 
 # --- Show Todos (Clear Button Labels) ---
 st.markdown(f"### Your Todos <span class='live'>LIVE</span>", unsafe_allow_html=True)
