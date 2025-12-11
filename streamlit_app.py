@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL, BUTTONS SIDE-BY-SIDE VERSION
+# streamlit_app.py ← FINAL, BUTTONS HORIZONTAL AND CORRECTLY ALIGNED
 import streamlit as st
 from supabase import create_client
 import time
@@ -41,7 +41,7 @@ def add_todo_callback():
 # --- Page Setup ---
 st.set_page_config(page_title="My Todos", page_icon="📝", layout="centered")
 
-# --- 💅 Custom CSS (Aggressive Resets for Alignment) ---
+# --- 💅 Custom CSS (FINAL BUTTON FIX) ---
 st.markdown("""
 <style>
     :root {
@@ -119,9 +119,21 @@ st.markdown("""
         vertical-align: middle;
         margin-left: 10px;
     }
+    
+    /* 🛑 NEW BUTTON LAYOUT FIX: Force buttons inside a single column to be horizontal */
+    .button-row {
+        display: flex;
+        gap: 0.5rem; /* Space between buttons */
+        width: 100%;
+        justify-content: space-between;
+    }
 
     /* Button Customization */
-    /* Ensure buttons inside sub-columns take up the space evenly */
+    /* Target buttons inside the button-row and make them take half the width minus the gap */
+    .button-row .stButton {
+        flex-grow: 1; /* Make both buttons expand evenly */
+    }
+
     .stButton > button { height: 38px; }
     .stButton button[kind="secondary"] { border-color: var(--danger-color); color: var(--danger-color); }
     .stButton button[kind="primary"] { background-color: var(--primary-color); border-color: var(--primary-color); }
@@ -187,7 +199,7 @@ if user:
                 on_click=add_todo_callback 
             )
 
-    # --- Show Todos (Layout Guaranteed - BUTTONS FIXED) ---
+    # --- Show Todos (Buttons Horizontal) ---
     st.markdown(f"### Your Todos <span class='live'>LIVE</span>", unsafe_allow_html=True)
 
     if not todos:
@@ -201,7 +213,7 @@ if user:
             with st.container(border=False):
                 st.markdown(f'<div class="{wrapper_class}">', unsafe_allow_html=True)
 
-                # 1. Use two main columns: c1 for task, c2 for both buttons (merged)
+                # 1. Use two main columns: c1 for task, c2_merged for both buttons
                 c1, c2_merged = st.columns([5, 3]) 
                 
                 with c1:
@@ -210,30 +222,32 @@ if user:
                     st.markdown(task_html, unsafe_allow_html=True) 
 
                 with c2_merged:
-                    # 2. NEST two columns inside the merged column for the buttons
-                    btn_col_done, btn_col_remove = st.columns(2)
+                    # 2. Wrap the buttons in the custom Flexbox div
+                    st.markdown('<div class="button-row">', unsafe_allow_html=True)
                     
-                    with btn_col_done:
-                        if completed:
-                            button_label = "Redo" 
-                            button_type = "secondary" 
-                        else:
-                            button_label = "Done"
-                            button_type = "primary" 
+                    # 3. Done/Redo Button
+                    if completed:
+                        button_label = "Redo" 
+                        button_type = "secondary" 
+                    else:
+                        button_label = "Done"
+                        button_type = "primary" 
 
-                        if st.button(button_label, key=f"tog_{todo['id']}", use_container_width=True, type=button_type):
-                            supabase.table("todos").update({"is_complete": not completed})\
-                                .eq("id", todo["id"]).execute()
-                            st.cache_data.clear()
-                            st.rerun()
+                    if st.button(button_label, key=f"tog_{todo['id']}", use_container_width=True, type=button_type):
+                        supabase.table("todos").update({"is_complete": not completed})\
+                            .eq("id", todo["id"]).execute()
+                        st.cache_data.clear()
+                        st.rerun()
                     
-                    with btn_col_remove:
-                        if st.button("Remove", key=f"del_{todo['id']}", use_container_width=True, type="secondary"):
-                            supabase.table("todos").delete().eq("id", todo["id"]).execute()
-                            st.cache_data.clear()
-                            st.rerun()
+                    # 4. Remove Button
+                    if st.button("Remove", key=f"del_{todo['id']}", use_container_width=True, type="secondary"):
+                        supabase.table("todos").delete().eq("id", todo["id"]).execute()
+                        st.cache_data.clear()
+                        st.rerun()
                         
-                st.markdown("</div>", unsafe_allow_html=True)
+                    st.markdown('</div>', unsafe_allow_html=True) # Close button-row div
+                        
+                st.markdown("</div>", unsafe_allow_html=True) # Close wrapper div
 
     # --- Auto-refresh ---
     time.sleep(3)
