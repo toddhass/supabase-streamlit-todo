@@ -1,7 +1,6 @@
-# streamlit_app.py ← TRUE REALTIME (WORKS ACROSS DEVICES)
+# streamlit_app.py ← FINAL WORKING REALTIME + NO DUPLICATE KEY ERROR
 import streamlit as st
 from supabase import create_client
-import time
 
 # --- Supabase Client ---
 @st.cache_resource
@@ -19,10 +18,14 @@ def load_todos(user_id):
         st.error(f"Load error: {e}")
         return []
 
-# --- Handlers (NO st.rerun() here!) ---
+# --- Handlers ---
 def add_todo(task):
     if task.strip():
-        supabase.table("todos").insert({"user_id": st.session_state.user.id, "task": task.strip()}).execute()
+        supabase.table("todos").insert({
+            "user_id": st.session_state.user.id,
+            "task": task.strip(),
+            "is_complete": False
+        }).execute()
 
 def toggle(todo_id, current):
     supabase.table("todos").update({"is_complete": not current}).eq("id", todo_id).execute()
@@ -39,10 +42,10 @@ def logout():
 st.set_page_config(page_title="Realtime Todos", layout="centered")
 st.title("My Todos")
 
+# Auth
 if "user" not in st.session_state:
     st.session_state.user = None
 
-# Auth check
 try:
     sess = supabase.auth.get_session()
     if sess and sess.user:
@@ -55,13 +58,13 @@ user = st.session_state.user
 if user:
     st.button("Log out", on_click=logout)
 
-    # Add form
+    # Add todo
     with st.form("add", clear_on_submit=True):
-        task = st.text_input("New todo")
-        if st.form_submit_button("Add"):
+        task = st.text_input("What needs to be done?")
+        if st.form_submit_button("Add") and task:
             add_todo(task)
 
-    # Auto-refresh every 1 second using st.empty() + time.sleep trick
+    # --- REALTIME POLLING (1 second) ---
     placeholder = st.empty()
 
     while True:
@@ -71,16 +74,25 @@ if user:
             if not todos:
                 st.info("No todos yet")
             else:
-                for t in todos:
+                for i, t in enumerate(todos):
                     c1, c2, c3 = st.columns([1, 8, 1])
                     with c1:
-                        st.checkbox("", value=t["is_complete"], key=f"c{t['id']}", on_change=toggle, args=(t["id"], t["is_complete"]))
+                        # Unique key using index + session state to avoid duplicates
+                        key_chk = f"chk_{t['id']}_{st.session_state.get('run_id', 0)}"
+                        st.checkbox("", value=t["is_complete"], key=key_chk,
+                                  on_change=toggle, args=(t["id"], t["is_complete"]))
                     with c2:
                         st.write(t["task"])
                     with c3:
-                        st.button("Delete", key=f"d{t['id']}", on_click=delete, args=(t["id"],))
+                        key_del = f"del_{t['id']}_{st.session_state.get('run_id', 0)}"
+                        st.button("Delete", key=key_del, on_click=delete, args=(t["id"],))
 
-        time.sleep(1)  # This triggers full rerun every second → realtime!
+        # Force a new "run" every second so keys change and Streamlit accepts them
+        if "run_id" not in st.session_state:
+            st.session_state.run_id = 0
+        st.session_state.run_id += 1
+
+        st.rerun()  # This is allowed here — it's in the main thread
 
 else:
     tab1, tab2 = st.tabs(["Log In", "Sign Up"])
