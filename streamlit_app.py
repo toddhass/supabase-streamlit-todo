@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL, LABELED COLUMN HEADERS
+# streamlit_app.py ← FINAL, TOGGLE SWITCH UI
 import streamlit as st
 from supabase import create_client
 import time
@@ -19,9 +19,9 @@ def load_todos(_user_id):
         .order("id", desc=True)\
         .execute().data
 
-# --- Checkbox Update Handler ---
+# --- Checkbox/Toggle Update Handler ---
 def update_todo_status(todo_id, new_status):
-    """Handles the change of the checkbox status."""
+    """Handles the change of the toggle status."""
     supabase.table("todos").update({"is_complete": new_status})\
         .eq("id", todo_id).execute()
     st.cache_data.clear()
@@ -48,7 +48,7 @@ def add_todo_callback():
 # --- Page Setup ---
 st.set_page_config(page_title="My Todos", page_icon="📝", layout="centered")
 
-# --- 💅 Custom CSS (Ensuring header text looks good) ---
+# --- 💅 Custom CSS (TOGGLE SWITCH IMPLEMENTATION) ---
 st.markdown("""
 <style>
     :root {
@@ -72,8 +72,7 @@ st.markdown("""
         margin-bottom: 0.5rem;
     }
 
-    /* Target the container holding the columns for the card look */
-    /* NOTE: We exclude any div with the 'header-row' class from receiving card styles */
+    /* Card Styling */
     div[data-testid="stVerticalBlock"] > div:has([data-testid="stHorizontalBlock"]) > div:not(.header-row) {
         background: var(--card-bg);
         margin: 1rem 0;
@@ -84,19 +83,17 @@ st.markdown("""
         padding: 0.5rem 1rem;
     }
     
-    /* ALIGNMENT FIX 1: Vertical centering for the columns */
+    /* Layout Alignment */
     div[data-testid="stHorizontalBlock"] {
         display: flex;
         align-items: center; 
     }
-    
-    /* ALIGNMENT FIX 2: Aggressively remove padding/margin from elements inside the column containers */
     div[data-testid="stHorizontalBlock"] > div[data-testid*="column"] {
         padding: 0 !important;
         margin: 0 !important;
     }
     
-    /* Styling for completed state */
+    /* Completed State Styling */
     .completed-todo div[data-testid="stHorizontalBlock"] {
         opacity: 0.85; 
         background: #f1f5f9; 
@@ -117,33 +114,78 @@ st.markdown("""
         color: var(--text-muted); 
     }
     
-    .live {
-        background: var(--primary-color);
-        color: white;
-        padding: 0.2rem 0.6rem;
-        border-radius: 999px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        vertical-align: middle;
-        margin-left: 10px;
-    }
-
-    /* Button Customization */
-    .stButton > button { height: 38px; }
-    .stButton button[kind="secondary"] { border-color: var(--danger-color); color: var(--danger-color); }
-    .stButton button[kind="primary"] { background-color: var(--primary-color); border-color: var(--primary-color); }
-
-    /* Custom Checkbox Styling: Reduce padding around checkbox */
-    div[data-testid="stCheckbox"] {
-        padding-top: 5px; 
-    }
-    
-    /* Styling for the new header text */
+    /* Header Text Styling */
     .header-text {
         font-weight: 700;
         font-size: 0.9rem;
-        color: #374151; /* Dark gray for a professional look */
+        color: #374151;
     }
+
+    /* 🛑 TOGGLE SWITCH CSS TRANSFORMATION 🛑 */
+    /* Target the checkbox container and hide the default element */
+    div[data-testid="stCheckbox"] label {
+        display: flex;
+        align-items: center;
+        /* Position the input to be invisible but clickable */
+    }
+    
+    div[data-testid="stCheckbox"] input[type="checkbox"] {
+        /* Hide native checkbox */
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    /* Create the visual slider track */
+    div[data-testid="stCheckbox"] label::before {
+        content: "";
+        position: relative;
+        cursor: pointer;
+        width: 40px; /* Toggle width */
+        height: 20px; /* Toggle height */
+        background-color: #ccc;
+        border-radius: 20px;
+        transition: 0.4s;
+        margin-right: 8px; /* Space between toggle and task text */
+    }
+
+    /* Create the visual slider handle (the circle) */
+    div[data-testid="stCheckbox"] label::after {
+        content: "";
+        position: absolute;
+        left: 2px; /* Starting position of handle */
+        top: 2px;
+        width: 16px; /* Handle size */
+        height: 16px;
+        background-color: white;
+        border-radius: 50%;
+        transition: 0.4s;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+    
+    /* Checked state: Track color and Handle position */
+    div[data-testid="stCheckbox"] input:checked + div > label::before {
+        background-color: var(--primary-color);
+    }
+
+    div[data-testid="stCheckbox"] input:checked + div > label::after {
+        transform: translateX(20px); /* Move handle to the right (40px width - 2px padding * 2 - 16px handle = 20px shift) */
+    }
+
+    /* Final fix for Streamlit's internal checkbox structure (if needed) */
+    div[data-testid="stCheckbox"] > label {
+        padding-top: 5px; /* Adjust top padding for vertical alignment */
+    }
+
+    /* Remove the default label text that Streamlit adds */
+    div[data-testid="stCheckbox"] > label > div:nth-child(2) {
+        display: none;
+    }
+
+    /* Button Customization (Remove button only) */
+    .stButton > button { height: 38px; }
+    .stButton button[kind="secondary"] { border-color: var(--danger-color); color: var(--danger-color); }
+    .stButton button[kind="primary"] { background-color: var(--primary-color); border-color: var(--primary-color); }
 
 </style>
 """, unsafe_allow_html=True)
@@ -206,20 +248,17 @@ if user:
                 on_click=add_todo_callback 
             )
 
-    # --- Show Todos (Task Text Prominence) ---
+    # --- Show Todos (Toggle Implemented) ---
     st.markdown(f"### Your Todos <span class='live'>LIVE</span>", unsafe_allow_html=True)
 
-    # 🛑 NEW HEADER ROW: Define the labels using the same column ratios
-    header_check, header_task, header_remove = st.columns([0.5, 7.5, 1.5])
-    
-    # We use a custom div class on the header row to exclude it from card styling
+    # 🛑 HEADER ROW: Labels for the columns
     with st.container(border=False):
         st.markdown('<div class="header-row">', unsafe_allow_html=True)
-        h_check, h_task, h_remove = st.columns([0.5, 7.5, 1.5])
+        # Use the same column ratios: [Toggle size, Task size, Button size]
+        h_toggle, h_task, h_remove = st.columns([0.5, 7.5, 1.5])
         
-        with h_check:
-            # Empty space for alignment
-            st.markdown("<p></p>", unsafe_allow_html=True) 
+        with h_toggle:
+            st.markdown('<p class="header-text" style="text-align: center;">DONE</p>', unsafe_allow_html=True)
         with h_task:
             st.markdown('<p class="header-text">TASK DESCRIPTION</p>', unsafe_allow_html=True)
         with h_remove:
@@ -239,14 +278,14 @@ if user:
                 st.markdown(f'<div class="{wrapper_class}">', unsafe_allow_html=True)
 
                 # 1. Use columns matching the header structure
-                c_check, c_task, c_remove = st.columns([0.5, 7.5, 1.5]) 
+                c_toggle, c_task, c_remove = st.columns([0.5, 7.5, 1.5]) 
                 
-                with c_check:
-                    # 2. Checkbox for status
+                with c_toggle:
+                    # 2. Checkbox transformed into a toggle switch
                     st.checkbox(
                         label="", 
                         value=completed, 
-                        key=f"check_{todo['id']}",
+                        key=f"toggle_{todo['id']}",
                         label_visibility="hidden",
                         on_change=update_todo_status,
                         args=(todo["id"], not completed)
