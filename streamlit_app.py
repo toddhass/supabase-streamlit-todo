@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL, API-COMPATIBLE VERSION
+# streamlit_app.py ← FINAL, API-COMPATIBLE VERSION (Indentation Fix)
 import streamlit as st
 from supabase import create_client
 
@@ -10,7 +10,7 @@ def get_supabase():
 
 supabase = get_supabase()
 
-# 🛑 FINAL FIX: Corrected API arguments for .order() 🛑
+# 🛑 FINAL FIX: Corrected Indentation for chained methods 🛑
 def load_todos(_user_id, status_filter):
     """Loads todos for the current user, applying filter and atomic sorting."""
     
@@ -23,14 +23,10 @@ def load_todos(_user_id, status_filter):
         
     # 3. Apply Sorting and Execute as a Single Chained Operation
     try:
+        # Indentation corrected here
         return base_query \
-            # FIX 1: Sort by completion status. is_complete=False (active) comes before True (completed)
-            # This is ASCENDING order, which is achieved with descending=False
-            .order("is_complete", descending=False) \ 
-            
-            # FIX 2: Sort by ID (newest first). This is DESCENDING order, achieved with descending=True
-            .order("id", descending=True) \ 
-            
+            .order("is_complete", descending=False) \
+            .order("id", descending=True) \
             .execute().data
             
     except Exception as e:
@@ -39,7 +35,7 @@ def load_todos(_user_id, status_filter):
         return []
 
 
-# --- Handlers (Unchanged, retained stability fixes) ---
+# --- Handlers (Unchanged) ---
 def update_todo_status(todo_id, new_status):
     """Handles the change of the toggle status."""
     supabase.table("todos").update({"is_complete": new_status})\
