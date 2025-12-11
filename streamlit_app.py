@@ -1,13 +1,12 @@
-# streamlit_app.py ← FINAL, FIXED, AND STABLE VERSION
+# streamlit_app.py ← FINAL, VERTICALLY ALIGNED VERSION
 import streamlit as st
 from supabase import create_client
 import time
 
-# --- Supabase Client & Function Definitions (Defined outside conditionals) ---
+# --- Supabase Client & Function Definitions ---
 
 @st.cache_resource
 def get_supabase():
-    # Ensure SUPABASE_URL and SUPABASE_KEY are in your .streamlit/secrets.toml
     return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 
 supabase = get_supabase()
@@ -29,25 +28,21 @@ def add_todo_callback():
     task_to_add = st.session_state.task_input
     
     if task_to_add.strip():
-        # 1. Insert the todo
         supabase.table("todos").insert({
             "user_id": st.session_state.user.id,
             "task": task_to_add.strip(),
             "is_complete": False
         }).execute()
 
-        # 2. Clear the input field's state
         st.session_state.task_input = "" 
-        
-        # 3. Clear the cache
         st.cache_data.clear()
     else:
-        pass # Handle empty task scenario if needed
+        pass
 
 # --- Page Setup ---
 st.set_page_config(page_title="My Todos", page_icon="📝", layout="centered")
 
-# --- 💅 Custom CSS ---
+# --- 💅 Custom CSS (WITH VERTICAL ALIGNMENT FIX) ---
 st.markdown("""
 <style>
     :root {
@@ -71,11 +66,10 @@ st.markdown("""
         margin-bottom: 0.5rem;
     }
 
-    /* Wrapper class that applies the actual card styling */
     .todo-card-wrapper {
         background: var(--card-bg);
         padding: 1.5rem; 
-        margin: -1rem; /* Adjusts padding to fill the Streamlit container area */
+        margin: -1rem;
         border-radius: 12px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
         border-left: 5px solid var(--primary-color);
@@ -88,11 +82,18 @@ st.markdown("""
         border-left-color: #94a3b8; 
     }
     
+    /* 🛑 VERTICAL ALIGNMENT FIX: Target the column container inside the wrapper */
+    /* This Flexbox selector centers the text/buttons vertically relative to each other */
+    .todo-card-wrapper > div:first-child > div {
+        display: flex;
+        align-items: center;
+    }
+    
     .task-text {
         font-weight: 600;
         margin: 0;
         padding: 0;
-        display: block;
+        display: block; 
         font-size: 1rem;
         line-height: 1.5rem;
     }
@@ -138,7 +139,7 @@ user = st.session_state.user
 
 if user:
     # ----------------------------------------------------
-    # LOGGED IN USER CONTENT (ALL DEPENDENT CODE MOVED HERE)
+    # LOGGED IN USER CONTENT
     # ----------------------------------------------------
     
     # Logout button and status
@@ -151,7 +152,7 @@ if user:
             st.rerun()
     st.success(f"Logged in as **{user.email}**")
 
-    # Load todos (now safe because 'user' is guaranteed to exist)
+    # Load todos
     todos = load_todos(user.id) 
 
     # --- Add Todo (Integrated Input with Callback) ---
@@ -179,7 +180,7 @@ if user:
                 on_click=add_todo_callback 
             )
 
-    # --- Show Todos (Layout Fixed) ---
+    # --- Show Todos ---
     st.markdown(f"### Your Todos <span class='live'>LIVE</span>", unsafe_allow_html=True)
 
     if not todos:
@@ -188,16 +189,13 @@ if user:
         for todo in todos:
             completed = todo.get("is_complete", False)
             
-            # Use st.container() for the block structure
             with st.container(border=False):
-                # 1. Start the HTML wrapper that provides the visual styling
                 st.markdown(f'<div class="todo-card-wrapper {"completed" if completed else ""}">', unsafe_allow_html=True)
                 
-                # 2. Create columns for layout
                 c1, c2, c3 = st.columns([5, 1.5, 1.5]) 
                 
                 with c1:
-                    # 3. Output the text using a span and the custom class
+                    # Output the text using a span and the custom class
                     task_html = f'<span class="task-text">{todo["task"]}</span>'
                     st.markdown(task_html, unsafe_allow_html=True) 
 
@@ -221,7 +219,6 @@ if user:
                         st.cache_data.clear()
                         st.rerun()
                         
-                # 4. Close the HTML wrapper
                 st.markdown("</div>", unsafe_allow_html=True)
 
     # --- Auto-refresh ---
