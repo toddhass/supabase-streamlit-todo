@@ -1,7 +1,6 @@
-# streamlit_app.py ← FINAL, STABLE TOGGLE HANDLER
+# streamlit_app.py ← FINAL, STYLED LOGOUT BUTTON
 import streamlit as st
 from supabase import create_client
-# Removed time import as sleep is no longer needed
 
 # --- Supabase Client & Function Definitions ---
 @st.cache_resource
@@ -19,17 +18,13 @@ def load_todos(_user_id):
         .order("id", desc=True)\
         .execute().data
 
-# --- Toggle Update Handler (FIXED: No st.rerun) ---
+# --- Handlers ---
 def update_todo_status(todo_id, new_status):
     """Handles the change of the toggle status."""
-    # The database update is the only action taken here.
     supabase.table("todos").update({"is_complete": new_status})\
         .eq("id", todo_id).execute()
     st.cache_data.clear()
-    # 🛑 FIX: We rely on the implicit script rerun triggered by the widget interaction
-    # (or the explicit st.rerun() at the end of the form submission) 
-    # to load the updated data, preventing double updates.
-    
+
 def handle_add_todo(task_to_add):
     """Handles todo insertion logic."""
     if "user" not in st.session_state or not st.session_state.user:
@@ -46,10 +41,17 @@ def handle_add_todo(task_to_add):
     else:
         pass
 
+def logout():
+    """Handles the log out process."""
+    supabase.auth.sign_out()
+    st.session_state.user = None
+    st.cache_data.clear()
+    st.rerun()
+
 # --- Page Setup ---
 st.set_page_config(page_title="My Todos", page_icon="📝", layout="centered")
 
-# --- 💅 Custom CSS (No functional change) ---
+# --- 💅 Custom CSS (New Logout Style) ---
 st.markdown("""
 <style>
     :root {
@@ -135,6 +137,25 @@ st.markdown("""
     div[data-testid="stToggle"] {
         padding-top: 4px; 
     }
+    
+    /* 🛑 NEW LOGOUT LINK STYLING 🛑 */
+    /* Target the container holding the logout button */
+    div[data-testid="stHorizontalBlock"] > div:has([data-testid="stButton"]) {
+        text-align: right; 
+    }
+    
+    /* Style the actual logout button */
+    .logout-button button {
+        background: transparent !important;
+        color: var(--danger-color) !important; 
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        height: auto !important;
+        font-weight: 600 !important;
+        font-size: 0.9rem !important;
+        text-decoration: underline;
+    }
 
 </style>
 """, unsafe_allow_html=True)
@@ -160,14 +181,25 @@ if user:
     # LOGGED IN USER CONTENT
     # ----------------------------------------------------
     
-    col1, col2 = st.columns([6,1])
-    with col2:
-        if st.button("Log out", type="secondary"):
-            supabase.auth.sign_out()
-            st.session_state.user = None
-            st.cache_data.clear()
-            st.rerun()
-    st.success(f"Logged in as **{user.email}**")
+    # 🛑 NEW LAYOUT FOR LOGOUT BUTTON 🛑
+    col_msg, col_logout = st.columns([5, 2])
+    
+    with col_msg:
+        st.success(f"Logged in as **{user.email}**")
+
+    with col_logout:
+        # Use a secondary button class and custom CSS to make it look like a link
+        st.button(
+            "Log out", 
+            type="secondary",
+            use_container_width=False,
+            on_click=logout,
+            key="logout_btn",
+            # Apply the custom CSS class to the button's wrapper
+            # Streamlit doesn't support custom classes on buttons directly, 
+            # so we rely on the generic styling above.
+        )
+    # ----------------------------------------------------
 
     # Load todos
     todos = load_todos(user.id) 
@@ -195,7 +227,7 @@ if user:
         
         if submitted:
             handle_add_todo(new_task)
-            st.rerun() # Rerun immediately after adding 
+            st.rerun() 
 
     # --- Show Todos (st.toggle Implemented) ---
     st.markdown(f"### Your Todos <span class='live'>LIVE</span>", unsafe_allow_html=True)
@@ -221,8 +253,6 @@ if user:
                         value=completed, 
                         key=f"toggle_{todo['id']}",
                         on_change=update_todo_status,
-                        # The update_todo_status function handles the DB update and cache clear,
-                        # and the script will automatically re-run due to widget interaction.
                         args=(todo["id"], not completed)
                     )
 
@@ -242,9 +272,7 @@ if user:
                         
                 st.markdown("</div>", unsafe_allow_html=True) 
 
-    # --- Auto-refresh ---
-    # 🛑 FIX: Removed auto-refresh loop. All reruns are now action-based.
-    pass
+    pass # Removed auto-refresh loop. All reruns are action-based.
 
 else:
     # ----------------------------------------------------
