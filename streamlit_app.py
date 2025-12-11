@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL, TOGGLE SWITCH UI
+# streamlit_app.py ← FINAL, NATIVE ST.TOGGLE UI
 import streamlit as st
 from supabase import create_client
 import time
@@ -19,9 +19,10 @@ def load_todos(_user_id):
         .order("id", desc=True)\
         .execute().data
 
-# --- Checkbox/Toggle Update Handler ---
+# --- Toggle Update Handler ---
 def update_todo_status(todo_id, new_status):
     """Handles the change of the toggle status."""
+    # new_status is the value of the toggle after interaction
     supabase.table("todos").update({"is_complete": new_status})\
         .eq("id", todo_id).execute()
     st.cache_data.clear()
@@ -48,7 +49,7 @@ def add_todo_callback():
 # --- Page Setup ---
 st.set_page_config(page_title="My Todos", page_icon="📝", layout="centered")
 
-# --- 💅 Custom CSS (TOGGLE SWITCH IMPLEMENTATION) ---
+# --- 💅 Custom CSS (Cleaned up for st.toggle) ---
 st.markdown("""
 <style>
     :root {
@@ -119,73 +120,30 @@ st.markdown("""
         font-weight: 700;
         font-size: 0.9rem;
         color: #374151;
+        /* Center the "Completed" header text */
+        text-align: center; 
     }
 
-    /* 🛑 TOGGLE SWITCH CSS TRANSFORMATION 🛑 */
-    /* Target the checkbox container and hide the default element */
-    div[data-testid="stCheckbox"] label {
-        display: flex;
-        align-items: center;
-        /* Position the input to be invisible but clickable */
-    }
-    
-    div[data-testid="stCheckbox"] input[type="checkbox"] {
-        /* Hide native checkbox */
-        opacity: 0;
-        width: 0;
-        height: 0;
+    .live {
+        background: var(--primary-color);
+        color: white;
+        padding: 0.2rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        vertical-align: middle;
+        margin-left: 10px;
     }
 
-    /* Create the visual slider track */
-    div[data-testid="stCheckbox"] label::before {
-        content: "";
-        position: relative;
-        cursor: pointer;
-        width: 40px; /* Toggle width */
-        height: 20px; /* Toggle height */
-        background-color: #ccc;
-        border-radius: 20px;
-        transition: 0.4s;
-        margin-right: 8px; /* Space between toggle and task text */
-    }
-
-    /* Create the visual slider handle (the circle) */
-    div[data-testid="stCheckbox"] label::after {
-        content: "";
-        position: absolute;
-        left: 2px; /* Starting position of handle */
-        top: 2px;
-        width: 16px; /* Handle size */
-        height: 16px;
-        background-color: white;
-        border-radius: 50%;
-        transition: 0.4s;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-    }
-    
-    /* Checked state: Track color and Handle position */
-    div[data-testid="stCheckbox"] input:checked + div > label::before {
-        background-color: var(--primary-color);
-    }
-
-    div[data-testid="stCheckbox"] input:checked + div > label::after {
-        transform: translateX(20px); /* Move handle to the right (40px width - 2px padding * 2 - 16px handle = 20px shift) */
-    }
-
-    /* Final fix for Streamlit's internal checkbox structure (if needed) */
-    div[data-testid="stCheckbox"] > label {
-        padding-top: 5px; /* Adjust top padding for vertical alignment */
-    }
-
-    /* Remove the default label text that Streamlit adds */
-    div[data-testid="stCheckbox"] > label > div:nth-child(2) {
-        display: none;
-    }
-
-    /* Button Customization (Remove button only) */
+    /* Button Customization */
     .stButton > button { height: 38px; }
     .stButton button[kind="secondary"] { border-color: var(--danger-color); color: var(--danger-color); }
     .stButton button[kind="primary"] { background-color: var(--primary-color); border-color: var(--primary-color); }
+
+    /* Fix for st.toggle: ensures it aligns vertically well */
+    div[data-testid="stToggle"] {
+        padding-top: 4px; 
+    }
 
 </style>
 """, unsafe_allow_html=True)
@@ -248,17 +206,17 @@ if user:
                 on_click=add_todo_callback 
             )
 
-    # --- Show Todos (Toggle Implemented) ---
+    # --- Show Todos (st.toggle Implemented) ---
     st.markdown(f"### Your Todos <span class='live'>LIVE</span>", unsafe_allow_html=True)
 
     # 🛑 HEADER ROW: Labels for the columns
     with st.container(border=False):
         st.markdown('<div class="header-row">', unsafe_allow_html=True)
-        # Use the same column ratios: [Toggle size, Task size, Button size]
-        h_toggle, h_task, h_remove = st.columns([0.5, 7.5, 1.5])
+        # NEW Column ratios: [Toggle + Label size, Task size, Button size]
+        h_toggle, h_task, h_remove = st.columns([1.5, 6.5, 1.5])
         
         with h_toggle:
-            st.markdown('<p class="header-text" style="text-align: center;">DONE</p>', unsafe_allow_html=True)
+            st.markdown('<p class="header-text">Completed</p>', unsafe_allow_html=True)
         with h_task:
             st.markdown('<p class="header-text">TASK DESCRIPTION</p>', unsafe_allow_html=True)
         with h_remove:
@@ -278,15 +236,14 @@ if user:
                 st.markdown(f'<div class="{wrapper_class}">', unsafe_allow_html=True)
 
                 # 1. Use columns matching the header structure
-                c_toggle, c_task, c_remove = st.columns([0.5, 7.5, 1.5]) 
+                c_toggle, c_task, c_remove = st.columns([1.5, 6.5, 1.5]) 
                 
                 with c_toggle:
-                    # 2. Checkbox transformed into a toggle switch
-                    st.checkbox(
-                        label="", 
+                    # 2. Native Streamlit Toggle for status
+                    st.toggle(
+                        label="Completed", 
                         value=completed, 
                         key=f"toggle_{todo['id']}",
-                        label_visibility="hidden",
                         on_change=update_todo_status,
                         args=(todo["id"], not completed)
                     )
