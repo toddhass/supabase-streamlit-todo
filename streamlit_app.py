@@ -10,27 +10,38 @@ def get_supabase():
 
 supabase = get_supabase()
 
-# 🛑 FINAL FIX: Atomic Query Execution 🛑
+# 🛑 FINAL FIX: Atomic Query Execution and Defensive Structure (No @st.cache_data) 🛑
 def load_todos(_user_id, status_filter):
     """Loads todos for the current user, applying filter and atomic sorting."""
     
-    # 1. Start the query and apply user ID filter
-    query = supabase.table("todos").select("*").eq("user_id", _user_id)
+    # 1. Start the base query
+    base_query = supabase.table("todos").select("*").eq("user_id", _user_id)
 
     # 2. Apply Conditional Filter
     if status_filter == "Active Tasks":
-        query = query.eq("is_complete", False)
+        # Apply the filter directly to the base query object.
+        # base_query now holds the filtered query object (or the unfiltered one if status_filter is "All Tasks")
+        base_query = base_query.eq("is_complete", False)
         
     # 3. Apply Sorting and Execute as a Single Chained Operation
-    # This ensures the query methods are called on the expected object type.
-    return query\
-        .order("is_complete", ascending=True)\
-        .order("id", desc=True)\
-        .execute().data
+    # This structure is the most stable for fluent APIs like Supabase's query builder.
+    try:
+        return base_query \
+            .order("is_complete", ascending=True) \
+            .order("id", desc=True) \
+            .execute().data
+            
+    except Exception as e:
+        # A defensive return to prevent the app from crashing entirely
+        # You can check Streamlit logs for the full error details if this runs.
+        st.error(f"Failed to load todos: {e}")
+        return []
 
-# --- Handlers (No cache clear needed for load_todos) ---
+
+# --- Handlers (Cleaned up, no cache clear for load_todos) ---
 def update_todo_status(todo_id, new_status):
     """Handles the change of the toggle status."""
+    # Note: No need for st.cache_data.clear() as load_todos is not cached.
     supabase.table("todos").update({"is_complete": new_status})\
         .eq("id", todo_id).execute()
 
