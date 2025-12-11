@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL, FLAWLESS, REAL-TIME TODO APP (December 11 2025)
+# streamlit_app.py ← FINAL WORKING VERSION (December 11 2025)
 import streamlit as st
 from supabase import create_client
 import time
@@ -10,9 +10,10 @@ def get_supabase():
 
 supabase = get_supabase()
 
-# Page config & style
+# Page setup
 st.set_page_config(page_title="My Todos", page_icon="Checkmark", layout="centered")
 
+# Beautiful CSS
 st.markdown("""
 <style>
     .big-title {font-size:4.5rem!important;font-weight:900;text-align:center;
@@ -53,23 +54,23 @@ else:
     tab1, tab2 = st.tabs(["Log In", "Sign Up"])
 
     with tab1:
-        with st.form("login"):
+        with st.form("login_form"):
             email = st.text_input("Email")
-            pw = st.text_input("Password", type="password")
+            password = st.text_input("Password", type="password")
             if st.form_submit_button("Log In", type="primary"):
                 try:
-                    supabase.auth.sign_in_with_password({"email": email, "password": pw})
+                    supabase.auth.sign_in_with_password({"email": email, "password": password})
                     st.rerun()
                 except:
                     st.error("Wrong email or password")
 
     with tab2:
-        with st.form("signup"):
-            email = st.text_input("Email", key="su_email")
-            pw = st.text_input("Password", type="password", key="su_pw")
+        with st.form("signup_form"):
+            email = st.text_input("Email", key="signup_email")
+            password = st.text_input("Password", type="password", key="signup_password")
             if st.form_submit_button("Sign Up", type="primary"):
                 try:
-                    supabase.auth.sign_up({"email": email, "password": pw})
+                    supabase.auth.sign_up({"email": email, "password": password})
                     st.success("Check your email to confirm!")
                     st.balloons()
                 except:
@@ -77,19 +78,60 @@ else:
 
     st.stop()
 
-# Load todos with short cache (feels real-time)
+# Load todos with short-lived cache (feels real-time)
 @st.cache_data(ttl=2, show_spinner=False)
-def get_todos(_user_id):
+def load_todos(_user_id):
     return supabase.table("todos")\
         .select("*")\
         .eq("user_id", _user_id)\
         .order("id", desc=True)\
         .execute().data
 
-todos = get_todos(user.id)
+todos = load_todos(user.id)
 
-# Add todo
+# Add new todo
 st.markdown("### Checkmark Add a new todo")
-with st.form("add", clear_on_submit=True):
+with st.form("add_form", clear_on_submit=True):
     task = st.text_area("What needs to be done?", height=100, label_visibility="collapsed")
-    if st.form_submit_button("Add Todo Checkmark", type="primary
+    if st.form_submit_button("Add Todo Checkmark", type="primary", use_container_width=True):
+        if task.strip():
+            supabase.table("todos").insert({
+                "user_id": user.id,
+                "task": task.strip(),
+                "is_complete": False
+            }).execute()
+            st.success("Added instantly!")
+            st.balloons()
+            st.cache_data.clear()
+            st.rerun()
+
+# Display todos
+st.markdown(f"### Checkmark Your Todos <span class='live'>LIVE</span>", unsafe_allow_html=True)
+
+if not todos:
+    st.info("No todos yet — add one above!")
+else:
+    for todo in todos:
+        completed = todo.get("is_complete", False)
+        with st.container():
+            st.markdown(f'<div class="todo-card {"completed" if completed else ""}">', unsafe_allow_html=True)
+            c1, c2, c3 = st.columns([6, 2, 2])
+            with c1:
+                icon = "Checkmark" if completed else "Circle"
+                st.markdown(f"### {icon} **{todo['task']}**")
+            with c2:
+                if st.button("Toggle", key=f"tog_{todo['id']}"):
+                    supabase.table("todos").update({"is_complete": not completed})\
+                        .eq("id", todo["id"]).execute()
+                    st.cache_data.clear()
+                    st.rerun()
+            with c3:
+                if st.button("Delete", key=f"del_{todo['id']}", type="secondary"):
+                    supabase.table("todos").delete().eq("id", todo["id"]).execute()
+                    st.cache_data.clear()
+                    st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+
+# Auto-refresh every 3 seconds when idle
+time.sleep(3)
+st.rerun()
