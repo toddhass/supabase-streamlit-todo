@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL, RPC WORKAROUND FIX
+# streamlit_app.py ← FINAL, RPC STABILITY FIX
 import streamlit as st
 from supabase import create_client
 
@@ -10,7 +10,7 @@ def get_supabase():
 
 supabase = get_supabase()
 
-# 🛑 FINAL FIX: Using RPC to bypass broken client sorting 🛑
+# 🛑 RPC Stability Fix: Ensuring a list is always returned 🛑
 def load_todos(_user_id, status_filter):
     """Loads todos for the current user using an RPC to bypass the broken client sorting."""
     
@@ -24,12 +24,16 @@ def load_todos(_user_id, status_filter):
         # Use rpc() to call the PostgreSQL function 'get_user_todos'.
         response = supabase.rpc("get_user_todos", params=params).execute()
         
-        # The result data is contained in the response.data attribute.
-        return response.data
+        # FINAL STABILITY FIX: Ensure response.data is a list.
+        data = response.data
+        if data is None:
+            return [] # Return empty list if None is returned
+            
+        return data
             
     except Exception as e:
         # A defensive return
-        st.error(f"Failed to load todos (Final, final attempt error: {e})")
+        st.error(f"Failed to load todos (RPC stability error: {e})")
         return []
 
 
