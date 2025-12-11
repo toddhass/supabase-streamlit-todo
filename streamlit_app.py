@@ -396,3 +396,4 @@ else:
                         st.error("Email already exists or invalid.")
 
     st.stop()
+    
