@@ -1,7 +1,6 @@
-# streamlit_app.py ← FINAL, SINGLE-CLICK LOGIN FIX
+# streamlit_app.py ← FINAL, WITH VIEW OPTIONS
 import streamlit as st
 from supabase import create_client
-# Removed time import as sleep is no longer needed
 
 # --- Supabase Client & Function Definitions ---
 @st.cache_resource
@@ -10,14 +9,20 @@ def get_supabase():
 
 supabase = get_supabase()
 
+# 🛑 Updated load_todos to accept a filter status 🛑
 @st.cache_data(ttl=2, show_spinner=False)
-def load_todos(_user_id):
-    """Loads todos for the current user."""
-    return supabase.table("todos")\
-        .select("*")\
-        .eq("user_id", _user_id)\
-        .order("id", desc=True)\
-        .execute().data
+def load_todos(_user_id, status_filter):
+    """Loads todos for the current user, applying filter and smart sorting."""
+    query = supabase.table("todos").select("*").eq("user_id", _user_id)
+
+    if status_filter == "Active Tasks":
+        # Only fetch tasks where is_complete is False
+        query = query.eq("is_complete", False)
+        
+    # Smart Sorting: Uncompleted (False) moves to the top, then by newest
+    query = query.order("is_complete", ascending=True).order("id", desc=True)
+
+    return query.execute().data
 
 # --- Handlers (No change here) ---
 def update_todo_status(todo_id, new_status):
@@ -140,7 +145,7 @@ st.markdown("""
         padding-top: 4px; 
     }
     
-    /* NEW LOGOUT BLOCK STYLING */
+    /* LOGOUT BLOCK STYLING */
     .user-info-block {
         background: #ecfdf5; 
         padding: 8px 15px; 
@@ -169,7 +174,7 @@ st.markdown("""
 st.markdown('<h1 class="big-title">My Modern Todos</h1>', unsafe_allow_html=True)
 st.caption("Real-time • Instant sync • Powered by Supabase")
 
-# --- Authentication Check (Standard Flow) ---
+# --- Authentication Check ---
 if "user" not in st.session_state:
     st.session_state.user = None
 
@@ -187,7 +192,7 @@ if user:
     # LOGGED IN USER CONTENT
     # ----------------------------------------------------
     
-    # Clean, one-line status and logout link
+    # User status and logout link
     with st.container(border=False):
         st.markdown(
             f"""
@@ -210,10 +215,7 @@ if user:
             """, unsafe_allow_html=True
         )
     
-    # Load todos
-    todos = load_todos(user.id) 
-
-    # --- Add Todo (Using st.form to prevent duplicate submissions) ---
+    # --- Add Todo (Using st.form) ---
     st.markdown("### Add a new todo")
 
     with st.form("add_todo_form", clear_on_submit=True):
@@ -237,12 +239,35 @@ if user:
         if submitted:
             handle_add_todo(new_task)
             st.rerun() 
-
-    # --- Show Todos (st.toggle Implemented) ---
+            
+    # --- 🛑 View Options / Filter 🛑 ---
     st.markdown(f"### Your Todos <span class='live'>LIVE</span>", unsafe_allow_html=True)
 
+    # Use a container for the filter to keep it visually grouped
+    with st.container(border=False):
+        # Default to 'Active Tasks' if no state exists
+        if 'view_filter' not in st.session_state:
+            st.session_state.view_filter = "Active Tasks"
+            
+        st.radio(
+            "Filter:",
+            options=["Active Tasks", "All Tasks"],
+            key='view_filter',
+            horizontal=True,
+            index=0, # Default to Active Tasks
+            label_visibility="hidden"
+        )
+    
+    # Load todos based on the user's selected filter
+    todos = load_todos(user.id, st.session_state.view_filter)
+
+    # --- Show Todos (List Display) ---
     if not todos:
-        st.info("No todos yet — add one above!")
+        # Check if the list is empty because of the filter
+        if st.session_state.view_filter == "Active Tasks":
+            st.info("No active todos! Time to relax, or switch to 'All Tasks' view.")
+        else:
+            st.info("No todos yet — add one above!")
     else:
         for todo in todos:
             completed = todo.get("is_complete", False)
@@ -298,20 +323,16 @@ else:
                     st.error("Please enter both fields")
                 else:
                     try:
-                        # 1. Attempt Sign-In
                         response = supabase.auth.sign_in_with_password({"email": email, "password": password})
                         
-                        # 2. FIX: Immediately update session state with the new user object
                         if response and response.user:
                             st.session_state.user = response.user
                             st.success("Logged in! Redirecting...")
                             st.rerun() 
                         else:
-                            # Handle cases where sign-in succeeds but user object is not immediately available (rare, but safe)
                             raise Exception("Login response incomplete.")
                             
                     except Exception as e:
-                        # Check the actual error message if needed, but display a generic error
                         st.error("Wrong email or password or connection issue.")
                         
     with tab2:
