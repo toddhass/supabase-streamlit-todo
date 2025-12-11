@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL, POSITIONAL SYNTAX FIX
+# streamlit_app.py ← FINAL, STABLE V1 SYNTAX
 import streamlit as st
 from supabase import create_client
 
@@ -10,24 +10,22 @@ def get_supabase():
 
 supabase = get_supabase()
 
-# 🛑 FINAL FIX: Corrected Positional Syntax for .order() 🛑
+# 🛑 FINAL FIX: Confirmed 2-positional argument V1 Postgrest Syntax 🛑
 def load_todos(_user_id, status_filter):
     """Loads todos for the current user, applying filter and atomic sorting."""
     
-    # 1. Start the base query
+    # 1. Start the query and apply user ID filter
     base_query = supabase.table("todos").select("*").eq("user_id", _user_id)
 
     # 2. Apply Conditional Filter
     if status_filter == "Active Tasks":
         base_query = base_query.eq("is_complete", False)
         
-    # 3. Apply Sorting and Execute as a Single Chained Operation
+    # 3. Apply Sorting and Execute. Use column.direction string format.
     try:
-        # FIX: Use column name as first argument, direction string as second argument.
-        return base_query \
-            .order('is_complete', 'asc') \
-            .order('id', 'desc') \
-            .execute().data
+        # Fix: Using single string argument for .order() to satisfy the 2-argument signature.
+        query = base_query.order('is_complete.asc').order('id.desc')
+        return query.execute().data
             
     except Exception as e:
         # A defensive return to prevent the app from crashing entirely
