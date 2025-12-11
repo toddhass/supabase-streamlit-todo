@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL, SIMPLIFIED CSS, LAYOUT-GUARANTEED VERSION
+# streamlit_app.py ← FINAL, BUTTONS SIDE-BY-SIDE VERSION
 import streamlit as st
 from supabase import create_client
 import time
@@ -41,7 +41,7 @@ def add_todo_callback():
 # --- Page Setup ---
 st.set_page_config(page_title="My Todos", page_icon="📝", layout="centered")
 
-# --- 💅 Custom CSS (Targeting Streamlit's native elements reliably) ---
+# --- 💅 Custom CSS (Aggressive Resets for Alignment) ---
 st.markdown("""
 <style>
     :root {
@@ -65,8 +65,7 @@ st.markdown("""
         margin-bottom: 0.5rem;
     }
 
-    /* 🛑 FINAL CARD FIX: Target the main container that holds the columns */
-    /* This targets a common parent element for the column set */
+    /* Target the container holding the columns for the card look */
     div[data-testid="stVerticalBlock"] > div:has([data-testid="stHorizontalBlock"]) > div {
         background: var(--card-bg);
         margin: 1rem 0;
@@ -74,16 +73,22 @@ st.markdown("""
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
         border-left: 5px solid var(--primary-color);
         transition: all 0.2s ease-in-out;
-        padding: 0.5rem 1rem; /* Padding for content inside the card */
+        padding: 0.5rem 1rem;
     }
     
-    /* 🛑 FINAL ALIGNMENT FIX: Target the column container itself */
+    /* ALIGNMENT FIX 1: Vertical centering for the columns */
     div[data-testid="stHorizontalBlock"] {
         display: flex;
-        align-items: center; /* Vertically center content */
+        align-items: center; 
     }
     
-    /* Modify styling for completed state */
+    /* ALIGNMENT FIX 2: Aggressively remove padding/margin from elements inside the column containers */
+    div[data-testid="stHorizontalBlock"] > div[data-testid*="column"] {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    /* Styling for completed state */
     .completed-todo div[data-testid="stHorizontalBlock"] {
         opacity: 0.85; 
         background: #f1f5f9; 
@@ -116,6 +121,7 @@ st.markdown("""
     }
 
     /* Button Customization */
+    /* Ensure buttons inside sub-columns take up the space evenly */
     .stButton > button { height: 38px; }
     .stButton button[kind="secondary"] { border-color: var(--danger-color); color: var(--danger-color); }
     .stButton button[kind="primary"] { background-color: var(--primary-color); border-color: var(--primary-color); }
@@ -181,7 +187,7 @@ if user:
                 on_click=add_todo_callback 
             )
 
-    # --- Show Todos (Layout Guaranteed) ---
+    # --- Show Todos (Layout Guaranteed - BUTTONS FIXED) ---
     st.markdown(f"### Your Todos <span class='live'>LIVE</span>", unsafe_allow_html=True)
 
     if not todos:
@@ -190,41 +196,42 @@ if user:
         for todo in todos:
             completed = todo.get("is_complete", False)
             
-            # Apply wrapper class to the surrounding div to handle completed styling
             wrapper_class = "completed-todo" if completed else ""
             
-            # Use st.container() for the block structure
             with st.container(border=False):
                 st.markdown(f'<div class="{wrapper_class}">', unsafe_allow_html=True)
 
-                # 1. Create columns for layout
-                c1, c2, c3 = st.columns([5, 1.5, 1.5]) 
+                # 1. Use two main columns: c1 for task, c2 for both buttons (merged)
+                c1, c2_merged = st.columns([5, 3]) 
                 
                 with c1:
-                    # 2. Output the text using a span and the custom class
                     text_class = "completed-text" if completed else ""
                     task_html = f'<span class="task-text {text_class}">{todo["task"]}</span>'
                     st.markdown(task_html, unsafe_allow_html=True) 
 
-                with c2:
-                    if completed:
-                        button_label = "Redo" 
-                        button_type = "secondary" 
-                    else:
-                        button_label = "Done"
-                        button_type = "primary" 
+                with c2_merged:
+                    # 2. NEST two columns inside the merged column for the buttons
+                    btn_col_done, btn_col_remove = st.columns(2)
+                    
+                    with btn_col_done:
+                        if completed:
+                            button_label = "Redo" 
+                            button_type = "secondary" 
+                        else:
+                            button_label = "Done"
+                            button_type = "primary" 
 
-                    if st.button(button_label, key=f"tog_{todo['id']}", use_container_width=True, type=button_type):
-                        supabase.table("todos").update({"is_complete": not completed})\
-                            .eq("id", todo["id"]).execute()
-                        st.cache_data.clear()
-                        st.rerun()
-                
-                with c3:
-                    if st.button("Remove", key=f"del_{todo['id']}", use_container_width=True, type="secondary"):
-                        supabase.table("todos").delete().eq("id", todo["id"]).execute()
-                        st.cache_data.clear()
-                        st.rerun()
+                        if st.button(button_label, key=f"tog_{todo['id']}", use_container_width=True, type=button_type):
+                            supabase.table("todos").update({"is_complete": not completed})\
+                                .eq("id", todo["id"]).execute()
+                            st.cache_data.clear()
+                            st.rerun()
+                    
+                    with btn_col_remove:
+                        if st.button("Remove", key=f"del_{todo['id']}", use_container_width=True, type="secondary"):
+                            supabase.table("todos").delete().eq("id", todo["id"]).execute()
+                            st.cache_data.clear()
+                            st.rerun()
                         
                 st.markdown("</div>", unsafe_allow_html=True)
 
