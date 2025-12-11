@@ -1,7 +1,7 @@
-# streamlit_app.py ← FINAL, OPTIMIZED LOGOUT UI
+# streamlit_app.py ← FINAL, SINGLE-CLICK LOGIN FIX
 import streamlit as st
 from supabase import create_client
-import time # Time is only needed in the authentication section, not for the todo logic
+# Removed time import as sleep is no longer needed
 
 # --- Supabase Client & Function Definitions ---
 @st.cache_resource
@@ -19,7 +19,7 @@ def load_todos(_user_id):
         .order("id", desc=True)\
         .execute().data
 
-# --- Handlers ---
+# --- Handlers (No change here) ---
 def update_todo_status(todo_id, new_status):
     """Handles the change of the toggle status."""
     supabase.table("todos").update({"is_complete": new_status})\
@@ -53,7 +53,7 @@ def logout():
 # --- Page Setup ---
 st.set_page_config(page_title="My Todos", page_icon="📝", layout="centered")
 
-# --- 💅 Custom CSS (Optimized for the new Logout style) ---
+# --- 💅 Custom CSS (No change) ---
 st.markdown("""
 <style>
     :root {
@@ -140,16 +140,15 @@ st.markdown("""
         padding-top: 4px; 
     }
     
-    /* 🛑 NEW LOGOUT BLOCK STYLING 🛑 */
+    /* NEW LOGOUT BLOCK STYLING */
     .user-info-block {
-        /* Styling for the container that holds the email and logout link */
-        background: #ecfdf5; /* Very light green background, matching success message */
+        background: #ecfdf5; 
         padding: 8px 15px; 
         border-radius: 8px;
         border: 1px solid #a7f3d0;
         margin-bottom: 1.5rem;
         display: flex;
-        justify-content: space-between; /* Push email left, link right */
+        justify-content: space-between; 
         align-items: center;
         font-size: 0.95rem;
     }
@@ -170,7 +169,7 @@ st.markdown("""
 st.markdown('<h1 class="big-title">My Modern Todos</h1>', unsafe_allow_html=True)
 st.caption("Real-time • Instant sync • Powered by Supabase")
 
-# --- Authentication Check ---
+# --- Authentication Check (Standard Flow) ---
 if "user" not in st.session_state:
     st.session_state.user = None
 
@@ -188,8 +187,7 @@ if user:
     # LOGGED IN USER CONTENT
     # ----------------------------------------------------
     
-    # 🛑 FIX: Clean, one-line status and logout link 🛑
-    # We use a button but style it to look like a link inside a colored block
+    # Clean, one-line status and logout link
     with st.container(border=False):
         st.markdown(
             f"""
@@ -198,12 +196,11 @@ if user:
                 <span style="float: right;">
             """, unsafe_allow_html=True
         )
-        # Use st.button for the click event, applying link-like styling via CSS
         st.button(
             "Log out", 
             on_click=logout, 
             key="logout_link_btn",
-            type="secondary", # Use secondary for red styling hook
+            type="secondary",
             use_container_width=False
         )
         st.markdown(
@@ -213,9 +210,6 @@ if user:
             """, unsafe_allow_html=True
         )
     
-    # --- The CSS above styles the secondary button to look like a red link. ---
-    # ----------------------------------------------------
-
     # Load todos
     todos = load_todos(user.id) 
 
@@ -291,7 +285,7 @@ if user:
 
 else:
     # ----------------------------------------------------
-    # NOT LOGGED IN CONTENT
+    # NOT LOGGED IN CONTENT (Login and Sign Up Tabs)
     # ----------------------------------------------------
     tab1, tab2 = st.tabs(["Log In", "Sign Up"])
 
@@ -304,12 +298,22 @@ else:
                     st.error("Please enter both fields")
                 else:
                     try:
-                        supabase.auth.sign_in_with_password({"email": email, "password": password})
-                        st.success("Logged in! Redirecting...")
-                        st.rerun()
-                    except:
-                        st.error("Wrong email or password")
-
+                        # 1. Attempt Sign-In
+                        response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                        
+                        # 2. FIX: Immediately update session state with the new user object
+                        if response and response.user:
+                            st.session_state.user = response.user
+                            st.success("Logged in! Redirecting...")
+                            st.rerun() 
+                        else:
+                            # Handle cases where sign-in succeeds but user object is not immediately available (rare, but safe)
+                            raise Exception("Login response incomplete.")
+                            
+                    except Exception as e:
+                        # Check the actual error message if needed, but display a generic error
+                        st.error("Wrong email or password or connection issue.")
+                        
     with tab2:
         with st.form("signup_form", clear_on_submit=False):
             email = st.text_input("Email", key="signup_email")
