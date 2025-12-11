@@ -6,6 +6,7 @@ import time
 # --- Supabase Client ---
 @st.cache_resource
 def get_supabase():
+    # Ensure SUPABASE_URL and SUPABASE_KEY are in your .streamlit/secrets.toml
     return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 
 supabase = get_supabase()
@@ -33,7 +34,7 @@ def add_todo_callback():
         # 3. Clear the cache (A rerun will automatically follow this callback)
         st.cache_data.clear()
     else:
-        # Optional: You could show a transient error message here if needed
+        # Optional: You could add a temporary message here if the task is empty
         pass
 
 # --- Page Setup ---
@@ -81,6 +82,12 @@ st.markdown("""
         border-left-color: #94a3b8; 
     }
     
+    /* Applying line-through via this class ensures Streamlit's markdown respects it */
+    .task-text {
+        font-weight: 600; /* Bold task text */
+        margin: 0;
+        padding: 0;
+    }
     .completed .task-text { 
         text-decoration: line-through; 
         color: var(--text-muted); 
@@ -195,7 +202,6 @@ with st.container():
     col_input, col_btn = st.columns([5, 1])
     
     with col_input:
-        # Input field is linked to st.session_state.task_input via key
         st.text_input(
             "What needs to be done?", 
             placeholder="e.g., Deploy modern UI changes", 
@@ -204,15 +210,14 @@ with st.container():
         )
     
     with col_btn:
-        # Use the callback function to safely submit and clear the input
         st.button(
             "Add", 
             type="primary", 
             use_container_width=True,
-            on_click=add_todo_callback # <-- THE SAFE WAY TO RESET STATE
+            on_click=add_todo_callback 
         )
 
-# --- Show Todos (Clear Button Labels) ---
+# --- Show Todos (Layout Fix Implemented) ---
 st.markdown(f"### Your Todos <span class='live'>LIVE</span>", unsafe_allow_html=True)
 
 if not todos:
@@ -221,35 +226,39 @@ else:
     for todo in todos:
         completed = todo.get("is_complete", False)
         
-        with st.container():
-            st.markdown(f'<div class="todo-card {"completed" if completed else ""}">', unsafe_allow_html=True)
-            
-            c1, c2, c3 = st.columns([5, 1.5, 1.5]) 
-            
-            with c1:
-                st.markdown(f'<h5 class="task-text">{todo["task"]}</h5>', unsafe_allow_html=True) 
+        # 1. Start the HTML card wrapper
+        st.markdown(f'<div class="todo-card {"completed" if completed else ""}">', unsafe_allow_html=True)
+        
+        # 2. Create columns for layout *inside* the card's visual space
+        c1, c2, c3 = st.columns([5, 1.5, 1.5]) 
+        
+        with c1:
+            # 3. Output the task text using a styled span to ensure containment
+            task_html = f'<span class="task-text">{todo["task"]}</span>'
+            st.markdown(task_html, unsafe_allow_html=True) 
 
-            with c2:
-                if completed:
-                    button_label = "Redo" 
-                    button_type = "secondary" 
-                else:
-                    button_label = "Done"
-                    button_type = "primary" 
+        with c2:
+            if completed:
+                button_label = "Redo" 
+                button_type = "secondary" 
+            else:
+                button_label = "Done"
+                button_type = "primary" 
 
-                if st.button(button_label, key=f"tog_{todo['id']}", use_container_width=True, type=button_type):
-                    supabase.table("todos").update({"is_complete": not completed})\
-                        .eq("id", todo["id"]).execute()
-                    st.cache_data.clear()
-                    st.rerun()
-            
-            with c3:
-                if st.button("Remove", key=f"del_{todo['id']}", use_container_width=True, type="secondary"):
-                    supabase.table("todos").delete().eq("id", todo["id"]).execute()
-                    st.cache_data.clear()
-                    st.rerun()
-                    
-            st.markdown("</div>", unsafe_allow_html=True)
+            if st.button(button_label, key=f"tog_{todo['id']}", use_container_width=True, type=button_type):
+                supabase.table("todos").update({"is_complete": not completed})\
+                    .eq("id", todo["id"]).execute()
+                st.cache_data.clear()
+                st.rerun()
+        
+        with c3:
+            if st.button("Remove", key=f"del_{todo['id']}", use_container_width=True, type="secondary"):
+                supabase.table("todos").delete().eq("id", todo["id"]).execute()
+                st.cache_data.clear()
+                st.rerun()
+                
+        # 4. Close the HTML card wrapper
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # --- Auto-refresh ---
 time.sleep(3)
