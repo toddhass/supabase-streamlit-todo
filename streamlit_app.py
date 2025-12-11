@@ -395,4 +395,4 @@ else:
                     except Exception as e:
                         st.error("Email already exists or invalid.")
 
-    st.stop() unsafe_allow
+    st.stop()
