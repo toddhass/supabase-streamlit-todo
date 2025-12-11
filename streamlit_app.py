@@ -22,16 +22,14 @@ def load_todos(_user_id, status_filter):
         query = query.eq("is_complete", False)
         
     # 3. Apply Primary Sort (Completed last)
-    # FIX: Apply the first order and reassign query
     query = query.order("is_complete", ascending=True)
 
     # 4. Apply Secondary Sort (Newest first)
-    # FIX: Apply the second order and reassign query
     query = query.order("id", desc=True)
 
     return query.execute().data
 
-# --- Handlers (No change here) ---
+# --- Handlers ---
 def update_todo_status(todo_id, new_status):
     """Handles the change of the toggle status."""
     supabase.table("todos").update({"is_complete": new_status})\
@@ -60,6 +58,11 @@ def logout():
     st.session_state.user = None
     st.cache_data.clear()
     st.rerun()
+
+def clear_todos_cache():
+    """Callback function to clear the todos cache when the filter changes."""
+    # This ensures a fresh query is built every time the filter is toggled.
+    st.cache_data.clear()
 
 
 # --- Page Setup ---
@@ -262,7 +265,8 @@ if user:
             key='view_filter',
             horizontal=True,
             index=0, # Default to Active Tasks
-            label_visibility="hidden"
+            label_visibility="hidden",
+            on_change=clear_todos_cache # 🛑 FIX: Clear the cache when the filter is changed
         )
     
     # Load todos based on the user's selected filter
