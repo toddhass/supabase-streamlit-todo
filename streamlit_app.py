@@ -1,6 +1,6 @@
-# streamlit_app.py ← SIMPLIFIED VERSION
 import streamlit as st
 from supabase import create_client
+import threading
 
 # --- Supabase Client ---
 @st.cache_resource
@@ -26,7 +26,6 @@ def load_todos(_user_id):
 # --- Handlers ---
 def update_todo_status(todo_id, new_status):
     supabase.table("todos").update({"is_complete": new_status}).eq("id", todo_id).execute()
-    st.rerun()
 
 def handle_add_todo(task_to_add):
     if task_to_add.strip():
@@ -35,16 +34,31 @@ def handle_add_todo(task_to_add):
             "task": task_to_add.strip(),
             "is_complete": False
         }).execute()
-        st.rerun()
 
 def delete_todo(todo_id):
     supabase.table("todos").delete().eq("id", todo_id).execute()
-    st.rerun()
 
 def logout():
     supabase.auth.sign_out()
     st.session_state.user = None
     st.rerun()
+
+# --- Realtime Subscription ---
+def setup_realtime(user_id):
+    def realtime_listener():
+        channel = supabase.channel('todo-changes')
+        channel.on(
+            'postgres_changes',
+            {'event': '*', 'schema': 'public', 'table': 'todos', 'filter': f'user_id=eq.{user_id}'},
+            lambda payload: st.session_state.__setitem__('data_changed', True)
+        ).subscribe(blocking=True)
+
+    if 'realtime_thread' not in st.session_state:
+        thread = threading.Thread(target=realtime_listener)
+        thread.daemon = True
+        thread.start()
+        st.session_state['realtime_thread'] = thread
+        st.session_state['data_changed'] = False
 
 # --- Page Setup ---
 st.set_page_config(page_title="My Todos", page_icon="📝", layout="centered")
@@ -65,6 +79,9 @@ except:
 user = st.session_state.user
 
 if user:
+    # Setup realtime
+    setup_realtime(user.id)
+
     # Logout
     st.button("Log out", on_click=logout)
 
@@ -74,6 +91,7 @@ if user:
         submitted = st.form_submit_button("Add")
         if submitted:
             handle_add_todo(new_task)
+            st.session_state['data_changed'] = True  # Force refresh after add
 
     # Load Todos
     todos = load_todos(user.id)
@@ -82,13 +100,20 @@ if user:
         st.info("No todos yet — add one above!")
     else:
         # Render in Table Format
-        st.table([
-            {
+        table_data = []
+        for todo in todos:
+            row = {
                 "Task": todo["task"],
                 "Completed": st.checkbox("Completed", value=todo["is_complete"], key=f"chk_{todo['id']}", on_change=update_todo_status, args=(todo["id"], not todo["is_complete"])),
                 "Delete": st.button("Delete", key=f"del_{todo['id']}", on_click=delete_todo, args=(todo["id"],))
-            } for todo in todos
-        ])
+            }
+            table_data.append(row)
+        st.table(table_data)
+
+    # Check for data change and rerun
+    if st.session_state.get('data_changed', False):
+        st.session_state['data_changed'] = False
+        st.rerun()
 
 else:
     # Login/Signup
