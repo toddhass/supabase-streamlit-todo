@@ -1,6 +1,7 @@
-# streamlit_app.py ← FINAL WORKING REALTIME (OFFICIAL + RELIABLE)
+# streamlit_app.py ← FINAL WORKING REALTIME (WORKS ON STREAMLIT CLOUD)
 import streamlit as st
 from supabase import create_client
+import time
 
 # --- Supabase Client ---
 @st.cache_resource
@@ -18,7 +19,7 @@ def load_todos(user_id):
         }).execute()
         return resp.data or []
     except Exception as e:
-        st.error(f"Error loading todos: {e}")
+        st.error(f"Error: {e}")
         return []
 
 # --- Handlers ---
@@ -67,22 +68,30 @@ if user:
         if st.form_submit_button("Add") and task:
             add_todo(task)
 
-    # OFFICIAL REALTIME: Auto-refresh every 1 second
-    st.autorefresh(interval=1000)  # This is supported and works perfectly
+    # REALTIME: Poll every 1 second (only reliable way on Streamlit Cloud)
+    placeholder = st.empty()
 
-    todos = load_todos(user.id)
+    while True:
+        todos = load_todos(user.id)
 
-    if not todos:
-        st.info("No todos yet — add one above!")
-    else:
-        data = []
-        for t in todos:
-            data.append({
-                "Task": t["task"],
-                "Done": st.checkbox("", value=t["is_complete"], key=f"done_{t['id']}", on_change=toggle, args=(t["id"], t["is_complete"])),
-                "Delete": st.button("Delete", key=f"del_{t['id']}", on_click=delete, args=(t["id"],))
-            })
-        st.table(data)
+        with placeholder.container():
+            if not todos:
+                st.info("No todos yet — add one above!")
+            else:
+                for t in todos:
+                    c1, c2, c3 = st.columns([1, 8, 1])
+                    with c1:
+                        st.checkbox("", value=t["is_complete"],
+                                  key=f"chk_{t['id']}", on_change=toggle,
+                                  args=(t["id"], t["is_complete"]))
+                    with c2:
+                        st.write(t["task"])
+                    with c3:
+                        st.button("Delete", key=f"del_{t['id']}",
+                                on_click=delete, args=(t["id"],))
+
+        time.sleep(1)  # 1-second realtime
+        st.rerun()     # This is allowed in main script
 
 else:
     tab1, tab2 = st.tabs(["Log In", "Sign Up"])
