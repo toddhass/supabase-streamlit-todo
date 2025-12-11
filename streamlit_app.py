@@ -1,6 +1,7 @@
-# streamlit_app.py ← FINAL, STYLED LOGOUT BUTTON
+# streamlit_app.py ← FINAL, OPTIMIZED LOGOUT UI
 import streamlit as st
 from supabase import create_client
+import time # Time is only needed in the authentication section, not for the todo logic
 
 # --- Supabase Client & Function Definitions ---
 @st.cache_resource
@@ -40,7 +41,7 @@ def handle_add_todo(task_to_add):
         st.cache_data.clear()
     else:
         pass
-
+        
 def logout():
     """Handles the log out process."""
     supabase.auth.sign_out()
@@ -48,10 +49,11 @@ def logout():
     st.cache_data.clear()
     st.rerun()
 
+
 # --- Page Setup ---
 st.set_page_config(page_title="My Todos", page_icon="📝", layout="centered")
 
-# --- 💅 Custom CSS (New Logout Style) ---
+# --- 💅 Custom CSS (Optimized for the new Logout style) ---
 st.markdown("""
 <style>
     :root {
@@ -138,23 +140,28 @@ st.markdown("""
         padding-top: 4px; 
     }
     
-    /* 🛑 NEW LOGOUT LINK STYLING 🛑 */
-    /* Target the container holding the logout button */
-    div[data-testid="stHorizontalBlock"] > div:has([data-testid="stButton"]) {
-        text-align: right; 
+    /* 🛑 NEW LOGOUT BLOCK STYLING 🛑 */
+    .user-info-block {
+        /* Styling for the container that holds the email and logout link */
+        background: #ecfdf5; /* Very light green background, matching success message */
+        padding: 8px 15px; 
+        border-radius: 8px;
+        border: 1px solid #a7f3d0;
+        margin-bottom: 1.5rem;
+        display: flex;
+        justify-content: space-between; /* Push email left, link right */
+        align-items: center;
+        font-size: 0.95rem;
     }
-    
-    /* Style the actual logout button */
-    .logout-button button {
-        background: transparent !important;
-        color: var(--danger-color) !important; 
-        border: none !important;
-        box-shadow: none !important;
-        padding: 0 !important;
-        height: auto !important;
-        font-weight: 600 !important;
-        font-size: 0.9rem !important;
+    .logout-link {
+        color: var(--danger-color); 
         text-decoration: underline;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .logged-in-email {
+        font-weight: 600;
+        color: var(--primary-color);
     }
 
 </style>
@@ -181,24 +188,32 @@ if user:
     # LOGGED IN USER CONTENT
     # ----------------------------------------------------
     
-    # 🛑 NEW LAYOUT FOR LOGOUT BUTTON 🛑
-    col_msg, col_logout = st.columns([5, 2])
-    
-    with col_msg:
-        st.success(f"Logged in as **{user.email}**")
-
-    with col_logout:
-        # Use a secondary button class and custom CSS to make it look like a link
+    # 🛑 FIX: Clean, one-line status and logout link 🛑
+    # We use a button but style it to look like a link inside a colored block
+    with st.container(border=False):
+        st.markdown(
+            f"""
+            <div class="user-info-block">
+                <span>Logged in as <span class="logged-in-email">{user.email}</span></span>
+                <span style="float: right;">
+            """, unsafe_allow_html=True
+        )
+        # Use st.button for the click event, applying link-like styling via CSS
         st.button(
             "Log out", 
-            type="secondary",
-            use_container_width=False,
-            on_click=logout,
-            key="logout_btn",
-            # Apply the custom CSS class to the button's wrapper
-            # Streamlit doesn't support custom classes on buttons directly, 
-            # so we rely on the generic styling above.
+            on_click=logout, 
+            key="logout_link_btn",
+            type="secondary", # Use secondary for red styling hook
+            use_container_width=False
         )
+        st.markdown(
+            """
+                </span>
+            </div>
+            """, unsafe_allow_html=True
+        )
+    
+    # --- The CSS above styles the secondary button to look like a red link. ---
     # ----------------------------------------------------
 
     # Load todos
@@ -272,7 +287,7 @@ if user:
                         
                 st.markdown("</div>", unsafe_allow_html=True) 
 
-    pass # Removed auto-refresh loop. All reruns are action-based.
+    pass
 
 else:
     # ----------------------------------------------------
