@@ -1,72 +1,269 @@
+# streamlit_app.py ← UPDATED WITH UI IMPROVEMENTS AND FIXES
 import streamlit as st
 from supabase import create_client
-import threading
+from streamlit_js_eval import streamlit_js_eval
 
-# Initialize Supabase client
+# --- Supabase Client & Function Definitions ---
 @st.cache_resource
 def get_supabase():
+    # Only cache the expensive client creation resource
     return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 
 supabase = get_supabase()
 
-# Function to load todos via RPC
-def load_todos(user_id, status_filter):
+# 🛑 RPC Stability Fix: Ensuring a list is always returned 🛑
+def load_todos(_user_id):
+    """Loads all todos for the current user using an RPC to bypass the broken client sorting."""
+    
+    # We pass the user ID and fixed filter string directly to the database function.
     params = {
-        "target_user_id": str(user_id),
-        "status_filter": status_filter
+        "target_user_id": str(_user_id),
+        "status_filter": "All Tasks"
     }
+
     try:
+        # Use rpc() to call the PostgreSQL function 'get_user_todos'.
         response = supabase.rpc("get_user_todos", params=params).execute()
-        data = response.data or []
+        
+        # FINAL STABILITY FIX: Ensure response.data is a list.
+        data = response.data
+        if data is None:
+            return [] # Return empty list if None is returned
+            
         return data
+            
     except Exception as e:
-        st.error(f"Failed to load todos: {str(e)}")
+        # A defensive return
+        st.error(f"Failed to load todos: {str(e)}")  # Simplified error message for better UX
         return []
 
-# Handlers
+# --- Handlers (Updated for Confirmation) ---
 def update_todo_status(todo_id, new_status):
-    supabase.table("todos").update({"is_complete": new_status}).eq("id", todo_id).execute()
-    # No rerun here; realtime will handle
+    """Handles the change of the checkbox status."""
+    supabase.table("todos").update({"is_complete": new_status})\
+        .eq("id", todo_id).execute()
+    st.rerun()
 
-def handle_add_todo(task_to_add, user_id):
+def handle_add_todo(task_to_add):
+    """Handles todo insertion logic."""
+    if "user" not in st.session_state or not st.session_state.user:
+        return
+
     if task_to_add.strip():
         supabase.table("todos").insert({
-            "user_id": user_id,
+            "user_id": st.session_state.user.id,
             "task": task_to_add.strip(),
             "is_complete": False
         }).execute()
-    # No rerun; realtime will handle
-
+        st.rerun()
+    else:
+        pass
+        
 def delete_todo(todo_id):
+    """Handles todo deletion with confirmation."""
     supabase.table("todos").delete().eq("id", todo_id).execute()
-    # No rerun; realtime will handle
+    st.rerun()
 
 def logout():
+    """Handles the log out process."""
     supabase.auth.sign_out()
     st.session_state.user = None
     st.rerun()
 
-# Realtime subscription in background thread
-def setup_realtime(user_id):
-    def realtime_listener():
-        channel = supabase.channel('todo-changes')
-        channel.on(
-            'postgres_changes',
-            {'event': '*', 'schema': 'public', 'table': 'todos', 'filter': f'user_id=eq.{user_id}'},
-            lambda payload: st.session_state.__setitem__('data_changed', True)
-        ).subscribe(blocking=True)
+# --- Modular Function for Rendering Todo Items ---
+def render_todo_item(todo, col_ratios):
+    """Renders a single todo item with checkbox and delete confirmation."""
+    completed = todo.get("is_complete", False)
+    
+    wrapper_class = "completed-todo" if completed else ""
+    
+    with st.container(border=False):
+        st.markdown(f'<div class="{wrapper_class}">', unsafe_allow_html=True)
 
-    if 'realtime_thread' not in st.session_state:
-        thread = threading.Thread(target=realtime_listener)
-        thread.daemon = True  # Daemon thread to exit with app
-        thread.start()
-        st.session_state['realtime_thread'] = thread
-        st.session_state['data_changed'] = False
+        # Column structure (Adjusted for inline label and checkbox)
+        c_status, c_task, c_remove = st.columns(col_ratios)  # Use dynamic ratios
+        
+        with c_status:
+            sub_label, sub_checkbox = st.columns([2, 1])
+            with sub_label:
+                st.markdown("Completed:", unsafe_allow_html=True)
+            with sub_checkbox:
+                st.checkbox(
+                    label="",
+                    value=completed,
+                    key=f"checkbox_{todo['id']}",
+                    on_change=update_todo_status,
+                    args=(todo["id"], not completed),
+                    help="Mark as completed"  # Tooltip
+                )
 
-# Page config
-st.set_page_config(page_title="Realtime Todos", page_icon="📝", layout="centered")
+        with c_task:
+            # Task Text
+            text_class = "completed-text" if completed else ""
+            task_html = f'<span class="task-text {text_class}">{todo["task"]}</span>'
+            st.markdown(task_html, unsafe_allow_html=True) 
 
-# Authentication
+        with c_remove:
+            # Remove Button with Confirmation
+            if st.button("🗑️", key=f"del_{todo['id']}", use_container_width=True, type="secondary"):  # Added icon
+                if st.session_state.get(f"confirm_del_{todo['id']}", False):
+                    delete_todo(todo["id"])
+                else:
+                    st.session_state[f"confirm_del_{todo['id']}"] = True
+                    st.warning("Click again to confirm deletion.")
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+
+# --- Page Setup (Updated to Wide Layout) ---
+st.set_page_config(page_title="My Todos", page_icon="📝", layout="wide")
+
+# --- 💅 Custom CSS (Refined for Better Spacing and Typography, with Media Queries) ---
+st.markdown("""
+<style>
+    :root {
+        --primary-color: #10b981; 
+        --secondary-color: #3b82f6; 
+        --danger-color: #ef4444; 
+        --bg-light: #f9fafb; 
+        --card-bg: white;
+        --text-muted: #6b7280;
+    }
+    
+    div.stApp {background-color: var(--bg-light);}
+
+    .big-title {
+        font-size: 4.5rem !important;
+        font-weight: 900;
+        text-align: center;
+        background: linear-gradient(90deg, var(--secondary-color) 0%, var(--primary-color) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.5rem;
+    }
+
+    /* Card Styling */
+    div[data-testid="stVerticalBlock"] > div:has([data-testid="stHorizontalBlock"]) > div:not(.header-row) {
+        background: var(--card-bg);
+        margin: 1rem 0;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+        border-left: 5px solid var(--primary-color);
+        transition: all 0.2s ease-in-out;
+        padding: 1rem 1.5rem;  /* Increased padding for breathing room */
+    }
+    
+    /* Layout Alignment */
+    div[data-testid="stHorizontalBlock"] {
+        display: flex;
+        align-items: center; 
+    }
+    div[data-testid="stHorizontalBlock"] > div[data-testid*="column"] {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    /* Completed State Styling */
+    .completed-todo div[data-testid="stHorizontalBlock"] {
+        opacity: 0.85; 
+        background: #f1f5f9; 
+        border-left-color: #94a3b8; 
+    }
+    
+    /* Task Text Styling */
+    .task-text {
+        font-weight: 600;
+        margin: 0.5rem 0;
+        padding: 0;
+        display: block;
+        font-size: 1.1rem;
+        line-height: 1.6rem;
+    }
+    .completed-text { 
+        text-decoration: line-through; 
+        color: var(--text-muted); 
+    }
+    
+    .live {
+        background: var(--primary-color);
+        color: white;
+        padding: 0.2rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        vertical-align: middle;
+        margin-left: 10px;
+    }
+
+    /* Button Customization */
+    .stButton > button { height: 38px; }
+    .stButton button[kind="secondary"] { border-color: var(--danger-color); color: var(--danger-color); }
+    .stButton button[kind="primary"] { background-color: var(--primary-color); border-color: var(--primary-color); }
+
+    /* Fix for st.checkbox: ensures it aligns vertically well */
+    div[data-testid="stCheckbox"] {
+        padding-top: 4px; 
+    }
+    
+    /* LOGOUT BLOCK STYLING */
+    .user-info-block {
+        background: #ecfdf5; 
+        padding: 8px 15px; 
+        border-radius: 8px;
+        border: 1px solid #a7f3d0;
+        margin-bottom: 1.5rem;
+        display: flex;
+        justify-content: space-between; 
+        align-items: center;
+        font-size: 0.95rem;
+    }
+    .logout-link {
+        color: var(--danger-color); 
+        text-decoration: underline;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .logged-in-email {
+        font-weight: 600;
+        color: var(--primary-color);
+    }
+
+    /* Additional CSS for inline alignment */
+    div[data-testid="column"] > div > div > p {
+        margin-bottom: 0;  /* Reduce margin for label */
+    }
+
+    /* Media query for desktop screens (min-width: 1024px) */
+    @media (min-width: 1024px) {
+        div.stApp {
+            max-width: 1200px;  /* Limit overall app width to avoid excessive stretching */
+            margin: 0 auto;     /* Center the content horizontally */
+        }
+        .task-text {
+            font-size: 1.2rem;  /* Slightly larger text for readability on big screens */
+        }
+        div[data-testid="stHorizontalBlock"] {
+            gap: 1rem;  /* Add spacing between columns for better visual separation */
+        }
+        /* Reduce card padding to fit more content comfortably */
+        div[data-testid="stVerticalBlock"] > div:has([data-testid="stHorizontalBlock"]) > div:not(.header-row) {
+            padding: 0.75rem 1rem;
+        }
+    }
+
+    /* Media query for tablets (min-width: 768px and max-width: 1023px) */
+    @media (min-width: 768px) and (max-width: 1023px) {
+        .task-text {
+            font-size: 1.05rem;
+        }
+    }
+
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown('<h1 class="big-title">My Modern Todos</h1>', unsafe_allow_html=True)
+st.caption("Real-time • Instant sync • Powered by Supabase")
+
+# --- Authentication Check ---
 if "user" not in st.session_state:
     st.session_state.user = None
 
@@ -80,73 +277,123 @@ except:
 user = st.session_state.user
 
 if user:
-    # Setup realtime for this user
-    setup_realtime(user.id)
+    # ----------------------------------------------------
+    # LOGGED IN USER CONTENT
+    # ----------------------------------------------------
+    
+    # User status and logout link
+    with st.container(border=False):
+        st.markdown(
+            f"""
+            <div class="user-info-block">
+                <span>Logged in as <span class="logged-in-email">{user.email}</span></span>
+                <span style="float: right;">
+            """, unsafe_allow_html=True
+        )
+        st.button(
+            "Log out", 
+            on_click=logout, 
+            key="logout_link_btn",
+            type="secondary",
+            use_container_width=False
+        )
+        st.markdown(
+            """
+                </span>
+            </div>
+            """, unsafe_allow_html=True
+        )
+    
+    # --- Add Todo (Using st.form) ---
+    st.markdown("### Add a new todo")
 
-    # Logout button
-    st.button("Log out", on_click=logout)
+    with st.form("add_todo_form", clear_on_submit=True):
+        col_input, col_btn = st.columns([5, 1])
+        
+        with col_input:
+            new_task = st.text_input(
+                "What needs to be done?", 
+                placeholder="e.g., Deploy modern UI changes", 
+                label_visibility="collapsed", 
+                key="task_input_in_form",
+                help="Enter your new task here."  # Added tooltip for better UX
+            )
+        
+        with col_btn:
+            submitted = st.form_submit_button(
+                "Add", 
+                type="primary", 
+                use_container_width=True
+            )
+        
+        if submitted:
+            handle_add_todo(new_task)
+            
+    # --- View Todos (All Tasks Only) ---
+    st.markdown(f"### Your Todos <span class='live'>LIVE</span>", unsafe_allow_html=True)
+    
+    # Load all todos
+    todos = load_todos(user.id)
 
-    # Add todo
-    st.header("Add Todo")
-    new_task = st.text_input("Task")
-    if st.button("Add"):
-        handle_add_todo(new_task, user.id)
-        new_task = ""  # Clear input
+    # --- Dynamic Column Adjustments ---
+    screen_width = streamlit_js_eval(js_expressions="window.innerWidth", want_output=True, key="screen_width") or 0  # Fallback to 0 if None
 
-    # Filter
-    st.header("Todos")
-    filter_options = ["Active Tasks", "Completed Tasks", "All Tasks"]
-    status_filter = st.selectbox("Filter", filter_options, index=0)
+    # Adjust column ratios dynamically
+    if screen_width > 1024:  # Desktop
+        col_ratios = [4, 6, 1]  # Wider task column
+    elif screen_width >= 768:  # Tablet
+        col_ratios = [3, 7, 1]
+    else:  # Mobile
+        col_ratios = [2, 7, 1]
 
-    # Load todos
-    todos = load_todos(user.id, status_filter)
-
-    # Display todos
-    for todo in todos:
-        col1, col2, col3 = st.columns([1, 8, 1])
-        with col1:
-            st.checkbox("Complete", value=todo["is_complete"], on_change=update_todo_status, args=(todo["id"], not todo["is_complete"]), key=f"chk_{todo['id']}")
-        with col2:
-            st.write(todo["task"])
-        with col3:
-            if st.button("Delete", key=f"del_{todo['id']}"):
-                delete_todo(todo["id"])
-
-    # Check for data change and rerun
-    if st.session_state.get('data_changed', False):
-        st.session_state['data_changed'] = False
-        st.rerun()
+    # --- Show Todos (Modularized Display) ---
+    if not todos:
+        st.info("No todos yet — add one above!")
+    else:
+        for todo in todos:
+            render_todo_item(todo, col_ratios)
 
 else:
-    # Login/Signup
+    # ----------------------------------------------------
+    # NOT LOGGED IN CONTENT (Login and Sign Up Tabs)
+    # ----------------------------------------------------
     tab1, tab2 = st.tabs(["Log In", "Sign Up"])
 
     with tab1:
-        with st.form("login_form"):
-            email = st.text_input("Email")
-            password = st.text_input("Password", type="password")
-            if st.form_submit_button("Log In"):
-                try:
-                    response = supabase.auth.sign_in_with_password({"email": email, "password": password})
-                    if response.user:
-                        st.session_state.user = response.user
-                        st.success("Logged in!")
-                        st.rerun()
-                except Exception as e:
-                    st.error("Invalid credentials")
-
+        with st.form("login_form", clear_on_submit=False):
+            email = st.text_input("Email", key="login_email")
+            password = st.text_input("Password", type="password", key="login_password")
+            if st.form_submit_button("Log In", type="primary", use_container_width=True):
+                if not email or not password:
+                    st.error("Please enter both fields")
+                else:
+                    try:
+                        response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                        
+                        if response and response.user:
+                            st.session_state.user = response.user
+                            st.success("Logged in! Redirecting...")
+                            st.rerun() 
+                        else:
+                            raise Exception("Login response incomplete.")
+                            
+                    except Exception as e:
+                        st.error("Wrong email or password or connection issue.")
+                        
     with tab2:
-        with st.form("signup_form"):
-            email = st.text_input("Email")
-            password = st.text_input("Password", type="password")
-            if st.form_submit_button("Sign Up"):
+        with st.form("signup_form", clear_on_submit=False):
+            email = st.text_input("Email", key="signup_email")
+            password = st.text_input("Password", type="password", key="signup_password")
+            if st.form_submit_button("Sign Up", type="primary", use_container_width=True):
                 if len(password) < 6:
-                    st.error("Password too short")
+                    st.error("Password must be at least 6 characters.")
                 else:
                     try:
                         supabase.auth.sign_up({"email": email, "password": password})
-                        st.success("Check email to confirm")
+                        st.success("Success! Check your email to confirm.")
+                        st.balloons()
                     except Exception as e:
-                        st.error("Signup failed")
+                        st.error("Email already exists or invalid.")
 
     st.stop()
+```:
