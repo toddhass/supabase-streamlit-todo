@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL, TASK TEXT PROMINENCE
+# streamlit_app.py ← FINAL, LABELED COLUMN HEADERS
 import streamlit as st
 from supabase import create_client
 import time
@@ -48,7 +48,7 @@ def add_todo_callback():
 # --- Page Setup ---
 st.set_page_config(page_title="My Todos", page_icon="📝", layout="centered")
 
-# --- 💅 Custom CSS (No functional change, only layout adjustment) ---
+# --- 💅 Custom CSS (Ensuring header text looks good) ---
 st.markdown("""
 <style>
     :root {
@@ -73,7 +73,8 @@ st.markdown("""
     }
 
     /* Target the container holding the columns for the card look */
-    div[data-testid="stVerticalBlock"] > div:has([data-testid="stHorizontalBlock"]) > div {
+    /* NOTE: We exclude any div with the 'header-row' class from receiving card styles */
+    div[data-testid="stVerticalBlock"] > div:has([data-testid="stHorizontalBlock"]) > div:not(.header-row) {
         background: var(--card-bg);
         margin: 1rem 0;
         border-radius: 12px;
@@ -135,6 +136,13 @@ st.markdown("""
     /* Custom Checkbox Styling: Reduce padding around checkbox */
     div[data-testid="stCheckbox"] {
         padding-top: 5px; 
+    }
+    
+    /* Styling for the new header text */
+    .header-text {
+        font-weight: 700;
+        font-size: 0.9rem;
+        color: #374151; /* Dark gray for a professional look */
     }
 
 </style>
@@ -201,6 +209,24 @@ if user:
     # --- Show Todos (Task Text Prominence) ---
     st.markdown(f"### Your Todos <span class='live'>LIVE</span>", unsafe_allow_html=True)
 
+    # 🛑 NEW HEADER ROW: Define the labels using the same column ratios
+    header_check, header_task, header_remove = st.columns([0.5, 7.5, 1.5])
+    
+    # We use a custom div class on the header row to exclude it from card styling
+    with st.container(border=False):
+        st.markdown('<div class="header-row">', unsafe_allow_html=True)
+        h_check, h_task, h_remove = st.columns([0.5, 7.5, 1.5])
+        
+        with h_check:
+            # Empty space for alignment
+            st.markdown("<p></p>", unsafe_allow_html=True) 
+        with h_task:
+            st.markdown('<p class="header-text">TASK DESCRIPTION</p>', unsafe_allow_html=True)
+        with h_remove:
+            st.markdown('<p class="header-text">ACTIONS</p>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    # -----------------------------------------------------------------
+
     if not todos:
         st.info("No todos yet — add one above!")
     else:
@@ -212,7 +238,7 @@ if user:
             with st.container(border=False):
                 st.markdown(f'<div class="{wrapper_class}">', unsafe_allow_html=True)
 
-                # 1. NEW COLUMNS: c_task is wider, c_remove is narrower
+                # 1. Use columns matching the header structure
                 c_check, c_task, c_remove = st.columns([0.5, 7.5, 1.5]) 
                 
                 with c_check:
@@ -227,7 +253,7 @@ if user:
                     )
 
                 with c_task:
-                    # 3. Task Text (Now takes up much more space)
+                    # 3. Task Text
                     text_class = "completed-text" if completed else ""
                     task_html = f'<span class="task-text {text_class}">{todo["task"]}</span>'
                     st.markdown(task_html, unsafe_allow_html=True) 
