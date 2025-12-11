@@ -75,7 +75,7 @@ def render_todo_item(todo, col_ratios):
     """Renders a single todo item with checkbox and delete confirmation."""
     completed = todo.get("is_complete", False)
     
-    wrapper_class = "completed-todo" if completed else ""
+    wrapper_class = "todo-card completed-todo" if completed else "todo-card"
     
     with st.container(border=False):
         st.markdown(f'<div class="{wrapper_class}">', unsafe_allow_html=True)
@@ -141,8 +141,8 @@ st.markdown("""
         margin-bottom: 0.5rem;
     }
 
-    /* Card Styling */
-    div[data-testid="stVerticalBlock"] > div:has([data-testid="stHorizontalBlock"]) > div:not(.header-row) {
+    /* Card Styling (Target specific class for todo items) */
+    .todo-card {
         background: var(--card-bg);
         margin: 1rem 0;
         border-radius: 12px;
@@ -150,6 +150,15 @@ st.markdown("""
         border-left: 5px solid var(--primary-color);
         transition: all 0.2s ease-in-out;
         padding: 1rem 1.5rem;  /* Increased padding for breathing room */
+        display: flex;
+        flex-direction: column;
+    }
+    
+    /* Completed State Styling */
+    .completed-todo {
+        opacity: 0.85; 
+        background: #f1f5f9; 
+        border-left-color: #94a3b8; 
     }
     
     /* Layout Alignment */
@@ -162,20 +171,13 @@ st.markdown("""
         margin: 0 !important;
     }
     
-    /* Completed State Styling */
-    .completed-todo div[data-testid="stHorizontalBlock"] {
-        opacity: 0.85; 
-        background: #f1f5f9; 
-        border-left-color: #94a3b8; 
-    }
-    
     /* Task Text Styling */
     .task-text {
         font-weight: 600;
-        margin: 0.5rem 0;
+        margin: 0;
         padding: 0;
-        display: block;
-        font-size: 1.1rem;  /* Slightly larger for better readability */
+        display: inline-block;
+        font-size: 1.1rem;
         line-height: 1.6rem;
     }
     .completed-text { 
@@ -245,7 +247,7 @@ st.markdown("""
             gap: 1rem;  /* Add spacing between columns for better visual separation */
         }
         /* Reduce card padding to fit more content comfortably */
-        div[data-testid="stVerticalBlock"] > div:has([data-testid="stHorizontalBlock"]) > div:not(.header-row) {
+        .todo-card {
             padding: 0.75rem 1rem;
         }
     }
@@ -416,4 +418,3 @@ else:
                         st.error("Email already exists or invalid.")
 
     st.stop()
-    
