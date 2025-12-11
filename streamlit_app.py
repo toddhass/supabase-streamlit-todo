@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL, CACHELESS QUERY FOR STABILITY
+# streamlit_app.py ← FINAL, ATOMIC QUERY STABILITY
 import streamlit as st
 from supabase import create_client
 
@@ -10,32 +10,29 @@ def get_supabase():
 
 supabase = get_supabase()
 
-# 🛑 FINAL FIX: REMOVE @st.cache_data ENTIRELY 🛑
-# The function will now execute from scratch on every rerun, which is safer for the query builder.
+# 🛑 FINAL FIX: Atomic Query Execution 🛑
 def load_todos(_user_id, status_filter):
-    """Loads todos for the current user, applying filter and smart sorting."""
+    """Loads todos for the current user, applying filter and atomic sorting."""
     
-    # 1. Start the query
+    # 1. Start the query and apply user ID filter
     query = supabase.table("todos").select("*").eq("user_id", _user_id)
 
     # 2. Apply Conditional Filter
     if status_filter == "Active Tasks":
         query = query.eq("is_complete", False)
         
-    # 3. Apply Primary Sort (Completed last)
-    query = query.order("is_complete", ascending=True)
+    # 3. Apply Sorting and Execute as a Single Chained Operation
+    # This ensures the query methods are called on the expected object type.
+    return query\
+        .order("is_complete", ascending=True)\
+        .order("id", desc=True)\
+        .execute().data
 
-    # 4. Apply Secondary Sort (Newest first)
-    query = query.order("id", desc=True)
-
-    return query.execute().data
-
-# --- Handlers (Simplified: no more st.cache_data.clear() needed for load_todos) ---
+# --- Handlers (No cache clear needed for load_todos) ---
 def update_todo_status(todo_id, new_status):
     """Handles the change of the toggle status."""
     supabase.table("todos").update({"is_complete": new_status})\
         .eq("id", todo_id).execute()
-    # No st.cache_data.clear() needed here anymore for load_todos
 
 def handle_add_todo(task_to_add):
     """Handles todo insertion logic."""
@@ -57,9 +54,6 @@ def logout():
     supabase.auth.sign_out()
     st.session_state.user = None
     st.rerun()
-
-# The clear_todos_cache function is now also unnecessary, as we removed the cache.
-
 
 # --- Page Setup ---
 st.set_page_config(page_title="My Todos", page_icon="📝", layout="centered")
@@ -255,16 +249,13 @@ if user:
         if 'view_filter' not in st.session_state:
             st.session_state.view_filter = "Active Tasks"
             
-        # The on_change property and index=0 are still valuable UX features
         st.radio(
             "Filter:",
             options=["Active Tasks", "All Tasks"],
             key='view_filter',
             horizontal=True,
-            index=0, 
+            index=0, # Default to Active Tasks
             label_visibility="hidden",
-            # We don't need the on_change callback to clear the cache,
-            # but we can use it to force a rerun for the filter change to take effect immediately
             on_change=st.rerun 
         )
     
