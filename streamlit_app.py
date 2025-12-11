@@ -1,11 +1,19 @@
+# streamlit_app.py ← SIMPLIFIED VERSION WITH REALTIME
 import streamlit as st
 from supabase import create_client
 import threading
 
-# --- Supabase Client ---
+# --- Supabase Client (with realtime logging enabled) ---
 @st.cache_resource
 def get_supabase():
-    return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
+    options = {
+        "realtime": {
+            "params": {
+                "log_level": "info"
+            }
+        }
+    }
+    return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"], options)
 
 supabase = get_supabase()
 
