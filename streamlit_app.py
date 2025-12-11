@@ -1,10 +1,9 @@
-# streamlit_app.py ← FINAL, LAYOUT-GUARANTEED VERSION
+# streamlit_app.py ← FINAL, SIMPLIFIED CSS, LAYOUT-GUARANTEED VERSION
 import streamlit as st
 from supabase import create_client
 import time
 
 # --- Supabase Client & Function Definitions ---
-
 @st.cache_resource
 def get_supabase():
     return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
@@ -42,7 +41,7 @@ def add_todo_callback():
 # --- Page Setup ---
 st.set_page_config(page_title="My Todos", page_icon="📝", layout="centered")
 
-# --- 💅 Custom CSS (Simplified and Targeted) ---
+# --- 💅 Custom CSS (Targeting Streamlit's native elements reliably) ---
 st.markdown("""
 <style>
     :root {
@@ -66,29 +65,32 @@ st.markdown("""
         margin-bottom: 0.5rem;
     }
 
-    /* 🛑 NEW FIX: Apply card styling and alignment directly to Streamlit's column container */
-    /* Target: The container holding the columns for each todo item */
-    .st-emotion-cache-1r65j0p { /* This targets a common inner column wrapper */
+    /* 🛑 FINAL CARD FIX: Target the main container that holds the columns */
+    /* This targets a common parent element for the column set */
+    div[data-testid="stVerticalBlock"] > div:has([data-testid="stHorizontalBlock"]) > div {
         background: var(--card-bg);
-        padding: 1rem 1.5rem 1rem 1.5rem; 
         margin: 1rem 0;
         border-radius: 12px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
         border-left: 5px solid var(--primary-color);
         transition: all 0.2s ease-in-out;
-        
-        /* 🛑 VERTICAL ALIGNMENT GUARANTEE */
+        padding: 0.5rem 1rem; /* Padding for content inside the card */
+    }
+    
+    /* 🛑 FINAL ALIGNMENT FIX: Target the column container itself */
+    div[data-testid="stHorizontalBlock"] {
         display: flex;
-        align-items: center;
+        align-items: center; /* Vertically center content */
     }
     
     /* Modify styling for completed state */
-    .completed-card .st-emotion-cache-1r65j0p {
+    .completed-todo div[data-testid="stHorizontalBlock"] {
         opacity: 0.85; 
         background: #f1f5f9; 
         border-left-color: #94a3b8; 
     }
     
+    /* Task Text Styling */
     .task-text {
         font-weight: 600;
         margin: 0;
@@ -142,7 +144,6 @@ if user:
     # LOGGED IN USER CONTENT
     # ----------------------------------------------------
     
-    # Logout button and status
     col1, col2 = st.columns([6,1])
     with col2:
         if st.button("Log out", type="secondary"):
@@ -189,18 +190,18 @@ if user:
         for todo in todos:
             completed = todo.get("is_complete", False)
             
-            # The class for completed state is applied here to wrap the column container
-            wrapper_class = "completed-card" if completed else ""
+            # Apply wrapper class to the surrounding div to handle completed styling
+            wrapper_class = "completed-todo" if completed else ""
             
-            # 1. Use st.container() to establish a block, and apply the wrapper class
+            # Use st.container() for the block structure
             with st.container(border=False):
                 st.markdown(f'<div class="{wrapper_class}">', unsafe_allow_html=True)
-                
-                # 2. Create columns for layout
+
+                # 1. Create columns for layout
                 c1, c2, c3 = st.columns([5, 1.5, 1.5]) 
                 
                 with c1:
-                    # 3. Output the text using st.markdown and the text styling class
+                    # 2. Output the text using a span and the custom class
                     text_class = "completed-text" if completed else ""
                     task_html = f'<span class="task-text {text_class}">{todo["task"]}</span>'
                     st.markdown(task_html, unsafe_allow_html=True) 
@@ -225,7 +226,6 @@ if user:
                         st.cache_data.clear()
                         st.rerun()
                         
-                # 4. Close the HTML wrapper
                 st.markdown("</div>", unsafe_allow_html=True)
 
     # --- Auto-refresh ---
