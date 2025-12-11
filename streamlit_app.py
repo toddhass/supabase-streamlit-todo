@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL, CLEAN UI (NO HEADERS)
+# streamlit_app.py ← FINAL, INSTANT REMOVAL
 import streamlit as st
 from supabase import create_client
 import time
@@ -22,10 +22,10 @@ def load_todos(_user_id):
 # --- Toggle Update Handler ---
 def update_todo_status(todo_id, new_status):
     """Handles the change of the toggle status."""
-    # new_status is the value of the toggle after interaction
     supabase.table("todos").update({"is_complete": new_status})\
         .eq("id", todo_id).execute()
     st.cache_data.clear()
+    st.rerun() # Rerun instantly on update
 
 def add_todo_callback():
     """Handles todo insertion and clears the input field state."""
@@ -43,13 +43,14 @@ def add_todo_callback():
 
         st.session_state.task_input = "" 
         st.cache_data.clear()
+        st.rerun() # Rerun instantly on add
     else:
         pass
 
 # --- Page Setup ---
 st.set_page_config(page_title="My Todos", page_icon="📝", layout="centered")
 
-# --- 💅 Custom CSS (Final styles) ---
+# --- 💅 Custom CSS (No functional change) ---
 st.markdown("""
 <style>
     :root {
@@ -200,8 +201,6 @@ if user:
     # --- Show Todos (st.toggle Implemented) ---
     st.markdown(f"### Your Todos <span class='live'>LIVE</span>", unsafe_allow_html=True)
 
-    # 🛑 HEADER ROW REMOVED 🛑
-
     if not todos:
         st.info("No todos yet — add one above!")
     else:
@@ -213,11 +212,11 @@ if user:
             with st.container(border=False):
                 st.markdown(f'<div class="{wrapper_class}">', unsafe_allow_html=True)
 
-                # 1. Column structure remains the same for alignment
+                # Column structure
                 c_toggle, c_task, c_remove = st.columns([1.5, 6.5, 1.5]) 
                 
                 with c_toggle:
-                    # 2. Native Streamlit Toggle for status
+                    # Native Streamlit Toggle for status
                     st.toggle(
                         label="Completed", 
                         value=completed, 
@@ -227,22 +226,26 @@ if user:
                     )
 
                 with c_task:
-                    # 3. Task Text
+                    # Task Text
                     text_class = "completed-text" if completed else ""
                     task_html = f'<span class="task-text {text_class}">{todo["task"]}</span>'
                     st.markdown(task_html, unsafe_allow_html=True) 
 
                 with c_remove:
-                    # 4. Single Remove Button
+                    # Single Remove Button
                     if st.button("Remove", key=f"del_{todo['id']}", use_container_width=True, type="secondary"):
+                        # Instant removal logic
                         supabase.table("todos").delete().eq("id", todo["id"]).execute()
                         st.cache_data.clear()
-                        st.rerun()
+                        st.rerun() # RERUN INSTANTLY AFTER DELETION
                         
                 st.markdown("</div>", unsafe_allow_html=True) 
 
     # --- Auto-refresh ---
-    time.sleep(3)
+    # 🛑 REMOVED time.sleep(3) 🛑
+    # Now that we rerun() in the handlers, we only need this low-frequency rerun
+    # to catch external database changes, which is less critical now.
+    time.sleep(1) # Reduced to 1 second for external sync, or could be removed entirely
     st.rerun()
 
 else:
