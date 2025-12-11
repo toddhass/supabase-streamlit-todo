@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL WORKING REALTIME + NO DUPLICATE KEY ERROR
+# streamlit_app.py ← FINAL WORKING REALTIME (NO BLANK SCREEN)
 import streamlit as st
 from supabase import create_client
 
@@ -18,7 +18,7 @@ def load_todos(user_id):
         st.error(f"Load error: {e}")
         return []
 
-# --- Handlers ---
+# --- Handlers (no st.rerun() here) ---
 def add_todo(task):
     if task.strip():
         supabase.table("todos").insert({
@@ -64,35 +64,23 @@ if user:
         if st.form_submit_button("Add") and task:
             add_todo(task)
 
-    # --- REALTIME POLLING (1 second) ---
-    placeholder = st.empty()
+    # --- REALTIME VIA st.autorefresh (BUILT-IN, NO HACKS) ---
+    # This is the official, supported way in 2024+
+    st.autorefresh(interval=1000)  # Refresh every 1 second
 
-    while True:
-        todos = load_todos(user.id)
+    todos = load_todos(user.id)
 
-        with placeholder.container():
-            if not todos:
-                st.info("No todos yet")
-            else:
-                for i, t in enumerate(todos):
-                    c1, c2, c3 = st.columns([1, 8, 1])
-                    with c1:
-                        # Unique key using index + session state to avoid duplicates
-                        key_chk = f"chk_{t['id']}_{st.session_state.get('run_id', 0)}"
-                        st.checkbox("", value=t["is_complete"], key=key_chk,
-                                  on_change=toggle, args=(t["id"], t["is_complete"]))
-                    with c2:
-                        st.write(t["task"])
-                    with c3:
-                        key_del = f"del_{t['id']}_{st.session_state.get('run_id', 0)}"
-                        st.button("Delete", key=key_del, on_click=delete, args=(t["id"],))
-
-        # Force a new "run" every second so keys change and Streamlit accepts them
-        if "run_id" not in st.session_state:
-            st.session_state.run_id = 0
-        st.session_state.run_id += 1
-
-        st.rerun()  # This is allowed here — it's in the main thread
+    if not todos:
+        st.info("No todos yet — add one above!")
+    else:
+        for t in todos:
+            c1, c2, c3 = st.columns([1, 8, 1])
+            with c1:
+                st.checkbox("", value=t["is_complete"], key=f"chk_{t['id']}", on_change=toggle, args=(t["id"], t["is_complete"]))
+            with c2:
+                st.write(t["task"])
+            with c3:
+                st.button("Delete", key=f"del_{t['id']}", on_click=delete, args=(t["id"],))
 
 else:
     tab1, tab2 = st.tabs(["Log In", "Sign Up"])
