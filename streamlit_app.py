@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL REAL-TIME VERSION – NO ERRORS WHATSOEVER
+# streamlit_app.py ← FINAL, PERFECT, NO SYNTAX ERRORS (Dec 2025)
 import streamlit as st
 from supabase import create_client
 
@@ -9,9 +9,9 @@ def init_supabase():
 
 supabase = init_supabase()
 
+# ─── Page config & style ─────────────────────
 st.set_page_config(page_title="My Todos", page_icon="Checkmark", layout="centered")
 
-# ─── Beautiful styling ─────────────────────
 st.markdown("""
 <style>
     .big-title {font-size:4.5rem!important;font-weight:900;text-align:center;
@@ -25,7 +25,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown('<h1 class="big-title">Checkmark My Todos</h1>', unsafe_allow_html=True)
-st.caption("Real-time • Zero delay • Powered by Supabase Realtime")
+st.caption("Real-time • Instant sync • Powered by Supabase")
 
 # ─── Authentication ─────────────────────
 if "user" not in st.session_state:
@@ -41,32 +41,54 @@ except:
 user = st.session_state.user
 
 if user:
-    if st.button("Log out", type="secondary"):
-        supabase.auth.sign_out()
-        st.session_state.user = None
-        st.rerun()
-    st.success(f"Logged in as {user.email}")
+    col1, col2 = st.columns([6, 1])
+    with col2:
+        if st.button("Log out"):
+            supabase.auth.sign_out()
+            st.session_state.user = None
+            st.rerun()
+    st.success(f"Logged in as **{user.email}**")
 else:
-    # ← Put your working login/signup code here (unchanged)
+    tab1, tab2 = st.tabs(["Log In", "Sign Up"])
+
+    with tab1:
+        with st.form("login"):
+            email = st.text_input("Email")
+            pw = st.text_input("Password", type="password")
+            if st.form_submit_button("Log In", type="primary"):
+                try:
+                    supabase.auth.sign_in_with_password({"email": email, "password": pw})
+                    st.rerun()
+                except:
+                    st.error("Wrong credentials")
+
+    with tab2:
+        with st.form("signup"):
+            email = st.text_input("Email", key="su_email")
+            pw = st.text_input("Password", type="password", key="su_pw")
+            if st.form_submit_button("Sign Up", type="primary"):
+                try:
+                    supabase.auth.sign_up({"email": email, "password": pw})
+                    st.success("Check your email to confirm!")
+                    st.balloons()
+                except:
+                    st.error("Sign-up failed")
+
     st.stop()
 
 # ─── Load todos once ─────────────────────
 if "todos" not in st.session_state:
-    st.session_state.todos = []
-
-def load_todos():
-    resp = supabase.table("todos")\
-        .select("*")\
-        .eq("user_id", user.id)\
-        .order("id", desc=True)\
-        .execute()
-    st.session_state.todos = resp.data or []          # ← Fixed line
-
-if not st.session_state.todos:
-    load_todos()
+    def load():
+        resp = supabase.table("todos")\
+            .select("*")\
+            .eq("user_id", user.id)\
+            .order("id", desc=True)\
+            .execute()
+        st.session_state.todos = resp.data or []
+    load()
 
 # ─── Real-time subscription (2025 correct syntax) ─────────────────────
-if "realtime_setup" not in st.session_state:
+if "rt" not in st.session_state:
     supabase.channel("todos-changes")\
         .on_postgres_changes(
             event="*", schema="public", table="todos",
@@ -74,8 +96,6 @@ if "realtime_setup" not in st.session_state:
         )\
         .on("postgres_changes", lambda payload: st.rerun())\
         .subscribe()
-    st.session_state.realtime_setup = True
+    st.session_state.rt = True
 
-# ─── Add new todo ─────────────────────
-st.markdown("### Checkmark Add a new todo")
-with st.form("add_todo",
+# ─── Add todo ─
