@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL, VERTICALLY ALIGNED VERSION
+# streamlit_app.py ← FINAL, LAYOUT-GUARANTEED VERSION
 import streamlit as st
 from supabase import create_client
 import time
@@ -42,7 +42,7 @@ def add_todo_callback():
 # --- Page Setup ---
 st.set_page_config(page_title="My Todos", page_icon="📝", layout="centered")
 
-# --- 💅 Custom CSS (WITH VERTICAL ALIGNMENT FIX) ---
+# --- 💅 Custom CSS (Simplified and Targeted) ---
 st.markdown("""
 <style>
     :root {
@@ -66,38 +66,38 @@ st.markdown("""
         margin-bottom: 0.5rem;
     }
 
-    .todo-card-wrapper {
+    /* 🛑 NEW FIX: Apply card styling and alignment directly to Streamlit's column container */
+    /* Target: The container holding the columns for each todo item */
+    .st-emotion-cache-1r65j0p { /* This targets a common inner column wrapper */
         background: var(--card-bg);
-        padding: 1.5rem; 
-        margin: -1rem;
+        padding: 1rem 1.5rem 1rem 1.5rem; 
+        margin: 1rem 0;
         border-radius: 12px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
         border-left: 5px solid var(--primary-color);
         transition: all 0.2s ease-in-out;
+        
+        /* 🛑 VERTICAL ALIGNMENT GUARANTEE */
+        display: flex;
+        align-items: center;
     }
     
-    .completed .todo-card-wrapper {
+    /* Modify styling for completed state */
+    .completed-card .st-emotion-cache-1r65j0p {
         opacity: 0.85; 
         background: #f1f5f9; 
         border-left-color: #94a3b8; 
-    }
-    
-    /* 🛑 VERTICAL ALIGNMENT FIX: Target the column container inside the wrapper */
-    /* This Flexbox selector centers the text/buttons vertically relative to each other */
-    .todo-card-wrapper > div:first-child > div {
-        display: flex;
-        align-items: center;
     }
     
     .task-text {
         font-weight: 600;
         margin: 0;
         padding: 0;
-        display: block; 
+        display: block;
         font-size: 1rem;
         line-height: 1.5rem;
     }
-    .completed .task-text { 
+    .completed-text { 
         text-decoration: line-through; 
         color: var(--text-muted); 
     }
@@ -180,7 +180,7 @@ if user:
                 on_click=add_todo_callback 
             )
 
-    # --- Show Todos ---
+    # --- Show Todos (Layout Guaranteed) ---
     st.markdown(f"### Your Todos <span class='live'>LIVE</span>", unsafe_allow_html=True)
 
     if not todos:
@@ -189,14 +189,20 @@ if user:
         for todo in todos:
             completed = todo.get("is_complete", False)
             
+            # The class for completed state is applied here to wrap the column container
+            wrapper_class = "completed-card" if completed else ""
+            
+            # 1. Use st.container() to establish a block, and apply the wrapper class
             with st.container(border=False):
-                st.markdown(f'<div class="todo-card-wrapper {"completed" if completed else ""}">', unsafe_allow_html=True)
+                st.markdown(f'<div class="{wrapper_class}">', unsafe_allow_html=True)
                 
+                # 2. Create columns for layout
                 c1, c2, c3 = st.columns([5, 1.5, 1.5]) 
                 
                 with c1:
-                    # Output the text using a span and the custom class
-                    task_html = f'<span class="task-text">{todo["task"]}</span>'
+                    # 3. Output the text using st.markdown and the text styling class
+                    text_class = "completed-text" if completed else ""
+                    task_html = f'<span class="task-text {text_class}">{todo["task"]}</span>'
                     st.markdown(task_html, unsafe_allow_html=True) 
 
                 with c2:
@@ -219,6 +225,7 @@ if user:
                         st.cache_data.clear()
                         st.rerun()
                         
+                # 4. Close the HTML wrapper
                 st.markdown("</div>", unsafe_allow_html=True)
 
     # --- Auto-refresh ---
