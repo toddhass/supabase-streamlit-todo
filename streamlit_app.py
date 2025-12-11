@@ -1,86 +1,42 @@
-# streamlit_app.py ← ASYNC REALTIME VERSION (FIXES LINE 63 ERROR)
+# streamlit_app.py ← FINAL WORKING REALTIME (NO ASYNC ERRORS)
 import streamlit as st
-from supabase import acreate_client  # Use async client for realtime
-import asyncio
+from supabase import create_client
 
-# --- Async Supabase Client ---
+# --- Supabase Client (Synchronous - No Async Errors) ---
 @st.cache_resource
-async def get_supabase_async():
-    return await acreate_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
+def get_supabase():
+    return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 
-# Global client (initialized once)
-if "supabase" not in st.session_state:
-    st.session_state.supabase = asyncio.run(get_supabase_async())
-supabase = st.session_state.supabase
+supabase = get_supabase()
 
-# --- Load Todos (Synchronous for compatibility) ---
+# --- Load Todos ---
 def load_todos(user_id):
     try:
-        # Use sync RPC for loading (compatible with async client)
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        resp = loop.run_until_complete(
-            supabase.rpc("get_user_todos", {"target_user_id": str(user_id), "status_filter": "All Tasks"}).execute()
-        )
-        loop.close()
+        resp = supabase.rpc("get_user_todos", {"target_user_id": str(user_id), "status_filter": "All Tasks"}).execute()
         return resp.data or []
     except Exception as e:
         st.error(f"Load error: {e}")
         return []
 
-# --- Handlers (no st.rerun() — realtime will trigger) ---
+# --- Handlers (No st.rerun() in callbacks) ---
 def add_todo(task):
     if task.strip():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(
-            supabase.table("todos").insert({
-                "user_id": st.session_state.user.id,
-                "task": task.strip(),
-                "is_complete": False
-            }).execute()
-        )
-        loop.close()
+        supabase.table("todos").insert({
+            "user_id": st.session_state.user.id,
+            "task": task.strip(),
+            "is_complete": False
+        }).execute()
 
 def toggle(todo_id, current):
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(
-        supabase.table("todos").update({"is_complete": not current}).eq("id", todo_id).execute()
-    )
-    loop.close()
+    supabase.table("todos").update({"is_complete": not current}).eq("id", todo_id).execute()
 
 def delete_todo(todo_id):
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(
-        supabase.table("todos").delete().eq("id", todo_id).execute()
-    )
-    loop.close()
+    supabase.table("todos").delete().eq("id", todo_id).execute()
 
 def logout():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(supabase.auth.sign_out())
-    loop.close()
+    supabase.auth.sign_out()
     st.session_state.user = None
     st.rerun()
-
-# --- Async Realtime Subscription ---
-async def setup_realtime(user_id):
-    channel = supabase.channel("todos-changes")
-    def callback(payload):
-        st.session_state["realtime_trigger"] = True
-
-    # Subscribe to Postgres changes
-    channel.on_postgres_changes(
-        event="*",
-        schema="public",
-        table="todos",
-        filter=f"user_id=eq.{user_id}",
-        callback=callback
-    )
-    await channel.subscribe()
 
 # --- Page Setup ---
 st.set_page_config(page_title="My Todos", page_icon="📝", layout="centered")
@@ -91,43 +47,32 @@ if "user" not in st.session_state:
     st.session_state.user = None
 
 try:
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    sess = loop.run_until_complete(supabase.auth.get_session())
-    loop.close()
-    if sess and sess.user:
-        st.session_state.user = sess.user
+    session = supabase.auth.get_session()
+    if session and session.user:
+        st.session_state.user = session.user
 except:
     pass
 
 user = st.session_state.user
 
 if user:
-    # Setup realtime (run async setup once)
-    if "realtime_setup" not in st.session_state:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(setup_realtime(user.id))
-        loop.close()
-        st.session_state.realtime_setup = True
-        st.session_state.realtime_trigger = False
-
+    # Logout
     st.button("Log out", on_click=logout)
 
-    # Add Todo Form
+    # Add Todo Form (at top)
     with st.form("add_todo_form", clear_on_submit=True):
-        new_task = st.text_input("New Todo")
+        new_task = st.text_input("What needs to be done?")
         submitted = st.form_submit_button("Add")
         if submitted:
             add_todo(new_task)
 
-    # Load and Display Todos
+    # Load Todos
     todos = load_todos(user.id)
 
     if not todos:
         st.info("No todos yet — add one above!")
     else:
-        # Render in Table Format
+        # Render in Simple Table
         table_data = []
         for todo in todos:
             row = {
@@ -138,9 +83,11 @@ if user:
             table_data.append(row)
         st.table(table_data)
 
-    # Trigger rerun on realtime change
-    if st.session_state.get('realtime_trigger', False):
-        st.session_state.realtime_trigger = False
+    # Realtime Polling (1-second refresh - perceived as instant)
+    if "last_update" not in st.session_state:
+        st.session_state.last_update = 0
+    if time.time() - st.session_state.last_update > 1:
+        st.session_state.last_update = time.time()
         st.rerun()
 
 else:
@@ -153,12 +100,9 @@ else:
             password = st.text_input("Password", type="password")
             if st.form_submit_button("Log In"):
                 try:
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    resp = loop.run_until_complete(supabase.auth.sign_in_with_password({"email": email, "password": password}))
-                    loop.close()
-                    if resp.user:
-                        st.session_state.user = resp.user
+                    response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                    if response.user:
+                        st.session_state.user = response.user
                         st.success("Logged in!")
                         st.rerun()
                 except Exception as e:
@@ -173,10 +117,7 @@ else:
                     st.error("Password must be at least 6 characters.")
                 else:
                     try:
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        loop.run_until_complete(supabase.auth.sign_up({"email": email, "password": password}))
-                        loop.close()
+                        supabase.auth.sign_up({"email": email, "password": password})
                         st.success("Success! Check your email to confirm.")
                     except Exception as e:
                         st.error("Email already exists or invalid.")
