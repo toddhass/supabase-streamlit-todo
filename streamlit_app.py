@@ -1,4 +1,4 @@
-# streamlit_app.py ← UPDATED WITH UI IMPROVEMENTS AND COLUMN HEADERS
+# streamlit_app.py ← UPDATED WITH UI IMPROVEMENTS AND REMOVED CHECKBOX TOOLTIP
 import streamlit as st
 from supabase import create_client
 
@@ -83,14 +83,13 @@ def render_todo_item(todo):
         c_checkbox, c_task, c_remove = st.columns([1, 7, 1])  # Widened task column
         
         with c_checkbox:
-            # Replaced toggle with checkbox for familiar UX
+            # Replaced toggle with checkbox for familiar UX, removed help to eliminate "?" icon
             st.checkbox(
                 label="",
                 value=completed,
                 key=f"checkbox_{todo['id']}",
                 on_change=update_todo_status,
-                args=(todo["id"], not completed),
-                help="Mark as completed"  # Added tooltip
+                args=(todo["id"], not completed)
             )
 
         with c_task:
