@@ -1,4 +1,4 @@
-# streamlit_app.py ← UPDATED WITH UI IMPROVEMENTS AND FIXES
+# streamlit_app.py ← UPDATED WITH UI IMPROVEMENTS AND COLUMN HEADERS
 import streamlit as st
 from supabase import create_client
 
@@ -101,7 +101,7 @@ def render_todo_item(todo):
 
         with c_remove:
             # Remove Button with Confirmation
-            if st.button("🗑️", key=f"del_{todo['id']}", use_container_width=True, type="secondary"):  # Added icon
+            if st.button("🗑️", key=f"del_{todo['id']}", use_container_width=True, type="secondary", help="Remove this todo"):  # Added tooltip
                 if st.session_state.get(f"confirm_del_{todo['id']}", False):
                     delete_todo(todo["id"])
                 else:
@@ -113,7 +113,7 @@ def render_todo_item(todo):
 # --- Page Setup (Updated to Wide Layout) ---
 st.set_page_config(page_title="My Todos", page_icon="📝", layout="wide")
 
-# --- 💅 Custom CSS (Refined for Better Spacing and Typography) ---
+# --- 💅 Custom CSS (Refined for Better Spacing, Typography, and Header) ---
 st.markdown("""
 <style>
     :root {
@@ -140,12 +140,22 @@ st.markdown("""
     /* Card Styling */
     div[data-testid="stVerticalBlock"] > div:has([data-testid="stHorizontalBlock"]) > div:not(.header-row) {
         background: var(--card-bg);
-        margin: 1rem 0;
+        margin: 0.5rem 0;  /* Reduced margin for tighter list */
         border-radius: 12px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
         border-left: 5px solid var(--primary-color);
         transition: all 0.2s ease-in-out;
         padding: 1rem 1.5rem;  /* Increased padding for breathing room */
+    }
+    
+    /* Header Row Styling */
+    .header-row {
+        padding: 0.5rem 1.5rem;
+        font-weight: bold;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        margin-bottom: 0.5rem;
     }
     
     /* Layout Alignment */
@@ -316,7 +326,7 @@ if user:
     # Load todos based on the user's selected filter
     todos = load_todos(user.id, st.session_state.view_filter)
 
-    # --- Show Todos (Modularized Display) ---
+    # --- Show Todos (With Header for Clarity) ---
     if not todos:
         if st.session_state.view_filter == "Active Tasks":
             st.info("No active todos! Time to relax, or switch to another view.")
@@ -325,6 +335,19 @@ if user:
         else:
             st.info("No todos yet — add one above!")
     else:
+        # Header Row
+        with st.container(border=False):
+            st.markdown('<div class="header-row">', unsafe_allow_html=True)
+            c_checkbox, c_task, c_remove = st.columns([1, 7, 1])
+            with c_checkbox:
+                st.markdown("Done", unsafe_allow_html=True)
+            with c_task:
+                st.markdown("Task", unsafe_allow_html=True)
+            with c_remove:
+                st.markdown("Remove", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Todo Items
         for todo in todos:
             render_todo_item(todo)
 
