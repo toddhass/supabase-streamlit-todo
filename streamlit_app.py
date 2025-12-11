@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL, CORRECTED, WORKING VERSION (December 2025)
+# streamlit_app.py ← FINAL, CORRECTED, FULLY FUNCTIONAL VERSION (December 11, 2025)
 import streamlit as st
 from supabase import create_client
 import time
@@ -89,4 +89,56 @@ else:
 @st.cache_data(ttl=2, show_spinner=False)
 def load_todos(_user_id):
     return supabase.table("todos")\
-        .
+        .select("*")\
+        .eq("user_id", _user_id)\
+        .order("id", desc=True)\
+        .execute().data
+
+todos = load_todos(user.id)
+
+# Add todo
+st.markdown("### Checkmark Add a new todo")
+with st.form("add_form", clear_on_submit=True):
+    task = st.text_area("What needs to be done?", height=100, label_visibility="collapsed")
+    if st.form_submit_button("Add Todo Checkmark", type="primary", use_container_width=True):
+        if task.strip():
+            supabase.table("todos").insert({
+                "user_id": user.id,
+                "task": task.strip(),
+                "is_complete": False
+            }).execute()
+            st.success("Added!")
+            st.balloons()
+            st.cache_data.clear()
+            st.rerun()
+
+# Show todos
+st.markdown(f"### Checkmark Your Todos <span class='live'>LIVE</span>", unsafe_allow_html=True)
+
+if not todos:
+    st.info("No todos yet — add one above!")
+else:
+    for todo in todos:
+        completed = todo.get("is_complete", False)
+        with st.container():
+            st.markdown(f'<div class="todo-card {"completed" if completed else ""}">', unsafe_allow_html=True)
+            c1, c2, c3 = st.columns([6, 2, 2])
+            with c1:
+                icon = "Checkmark" if completed else "Circle"
+                st.markdown(f"### {icon} **{todo['task']}**")
+            with c2:
+                if st.button("Toggle", key=f"tog_{todo['id']}"):
+                    supabase.table("todos").update({"is_complete": not completed})\
+                        .eq("id", todo["id"]).execute()
+                    st.cache_data.clear()
+                    st.rerun()
+            with c3:
+                if st.button("Delete", key=f"del_{todo['id']}", type="secondary"):
+                    supabase.table("todos").delete().eq("id", todo["id"]).execute()
+                    st.cache_data.clear()
+                    st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+
+# Auto-refresh
+time.sleep(3)
+st.rerun()
