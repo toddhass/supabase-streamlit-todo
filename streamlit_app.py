@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL, INSTANT REMOVAL
+# streamlit_app.py ← FINAL, DUPLICATE-PROOF UI
 import streamlit as st
 from supabase import create_client
 import time
@@ -25,15 +25,13 @@ def update_todo_status(todo_id, new_status):
     supabase.table("todos").update({"is_complete": new_status})\
         .eq("id", todo_id).execute()
     st.cache_data.clear()
-    st.rerun() # Rerun instantly on update
+    st.rerun() 
 
-def add_todo_callback():
-    """Handles todo insertion and clears the input field state."""
+def handle_add_todo(task_to_add):
+    """Handles todo insertion logic."""
     if "user" not in st.session_state or not st.session_state.user:
         return
 
-    task_to_add = st.session_state.task_input
-    
     if task_to_add.strip():
         supabase.table("todos").insert({
             "user_id": st.session_state.user.id,
@@ -41,9 +39,8 @@ def add_todo_callback():
             "is_complete": False
         }).execute()
 
-        st.session_state.task_input = "" 
         st.cache_data.clear()
-        st.rerun() # Rerun instantly on add
+        # st.rerun() will be triggered by the form submission logic
     else:
         pass
 
@@ -173,30 +170,32 @@ if user:
     # Load todos
     todos = load_todos(user.id) 
 
-    # --- Add Todo (Integrated Input with Callback) ---
+    # --- Add Todo (Using st.form to prevent duplicate submissions) ---
     st.markdown("### Add a new todo")
 
-    if "task_input" not in st.session_state:
-        st.session_state.task_input = "" 
-        
-    with st.container():
+    # 🛑 FIX: Use st.form with clear_on_submit=True
+    with st.form("add_todo_form", clear_on_submit=True):
         col_input, col_btn = st.columns([5, 1])
         
         with col_input:
-            st.text_input(
+            new_task = st.text_input(
                 "What needs to be done?", 
                 placeholder="e.g., Deploy modern UI changes", 
                 label_visibility="collapsed", 
-                key="task_input"
+                key="task_input_in_form" # New key for this input
             )
         
         with col_btn:
-            st.button(
+            submitted = st.form_submit_button(
                 "Add", 
                 type="primary", 
-                use_container_width=True,
-                on_click=add_todo_callback 
+                use_container_width=True
             )
+        
+        if submitted:
+            # Handle submission logic directly here, or call the simplified handler
+            handle_add_todo(new_task)
+            st.rerun() # Rerun immediately after adding (Form handles the clearing)
 
     # --- Show Todos (st.toggle Implemented) ---
     st.markdown(f"### Your Todos <span class='live'>LIVE</span>", unsafe_allow_html=True)
@@ -237,15 +236,12 @@ if user:
                         # Instant removal logic
                         supabase.table("todos").delete().eq("id", todo["id"]).execute()
                         st.cache_data.clear()
-                        st.rerun() # RERUN INSTANTLY AFTER DELETION
+                        st.rerun() 
                         
                 st.markdown("</div>", unsafe_allow_html=True) 
 
     # --- Auto-refresh ---
-    # 🛑 REMOVED time.sleep(3) 🛑
-    # Now that we rerun() in the handlers, we only need this low-frequency rerun
-    # to catch external database changes, which is less critical now.
-    time.sleep(1) # Reduced to 1 second for external sync, or could be removed entirely
+    time.sleep(1) 
     st.rerun()
 
 else:
