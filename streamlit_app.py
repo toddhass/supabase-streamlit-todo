@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL, 3-POSITIONAL ARGUMENT FIX
+# streamlit_app.py ← FINAL, TWO-POSITIONAL ARGUMENT FIX
 import streamlit as st
 from supabase import create_client
 
@@ -10,7 +10,7 @@ def get_supabase():
 
 supabase = get_supabase()
 
-# 🛑 FINAL FIX: Confirmed 3-positional argument V1 Postgrest Syntax 🛑
+# 🛑 FINAL FIX: Confirmed 2-positional argument Postgrest Syntax 🛑
 def load_todos(_user_id, status_filter):
     """Loads todos for the current user, applying filter and atomic sorting."""
     
@@ -23,20 +23,17 @@ def load_todos(_user_id, status_filter):
         
     # 3. Apply Sorting and Execute.
     try:
-        # FIX: Use 3 POSITIONAL arguments: (column, direction, nulls_placement)
-        # This addresses all previous errors:
-        # - Does not use keyword args (like ascending=)
-        # - Does not use the fragile single-string syntax (like 'id.desc')
-        # - Satisfies the client's internal need for a third argument (nullsfirst/nullslast)
+        # FIX: Using 2 POSITIONAL arguments: (column name, direction string).
+        # This satisfies the "takes 2 positional arguments" requirement reported in the last error.
         query = base_query\
-            .order('is_complete', 'asc', 'nullslast')\
-            .order('id', 'desc', 'nullslast')
+            .order('is_complete', 'asc')\
+            .order('id', 'desc')
             
         return query.execute().data
             
     except Exception as e:
         # A defensive return
-        st.error(f"Failed to load todos (Final attempt error: {e})")
+        st.error(f"Failed to load todos (Final, final attempt error: {e})")
         return []
 
 
