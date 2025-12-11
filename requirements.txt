@@ -1,3 +1,5 @@
 streamlit>=1.32
 supabase>=2.7.4
 nest-asyncio
+streamlit-supabase-connector
+supabase
