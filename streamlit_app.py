@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL, CLEANER CHECKBOX UI
+# streamlit_app.py ← FINAL, TASK TEXT PROMINENCE
 import streamlit as st
 from supabase import create_client
 import time
@@ -19,13 +19,12 @@ def load_todos(_user_id):
         .order("id", desc=True)\
         .execute().data
 
-# --- New: Checkbox Update Handler ---
+# --- Checkbox Update Handler ---
 def update_todo_status(todo_id, new_status):
     """Handles the change of the checkbox status."""
     supabase.table("todos").update({"is_complete": new_status})\
         .eq("id", todo_id).execute()
     st.cache_data.clear()
-    # No st.rerun() here, we let the main loop handle the refresh
 
 def add_todo_callback():
     """Handles todo insertion and clears the input field state."""
@@ -49,7 +48,7 @@ def add_todo_callback():
 # --- Page Setup ---
 st.set_page_config(page_title="My Todos", page_icon="📝", layout="centered")
 
-# --- 💅 Custom CSS (Optimized for Checkbox Layout) ---
+# --- 💅 Custom CSS (No functional change, only layout adjustment) ---
 st.markdown("""
 <style>
     :root {
@@ -199,7 +198,7 @@ if user:
                 on_click=add_todo_callback 
             )
 
-    # --- Show Todos (Checkbox Implemented) ---
+    # --- Show Todos (Task Text Prominence) ---
     st.markdown(f"### Your Todos <span class='live'>LIVE</span>", unsafe_allow_html=True)
 
     if not todos:
@@ -213,8 +212,8 @@ if user:
             with st.container(border=False):
                 st.markdown(f'<div class="{wrapper_class}">', unsafe_allow_html=True)
 
-                # 1. Use three columns: Checkbox, Task, Remove Button
-                c_check, c_task, c_remove = st.columns([0.5, 6.5, 2.5]) 
+                # 1. NEW COLUMNS: c_task is wider, c_remove is narrower
+                c_check, c_task, c_remove = st.columns([0.5, 7.5, 1.5]) 
                 
                 with c_check:
                     # 2. Checkbox for status
@@ -228,7 +227,7 @@ if user:
                     )
 
                 with c_task:
-                    # 3. Task Text (No change)
+                    # 3. Task Text (Now takes up much more space)
                     text_class = "completed-text" if completed else ""
                     task_html = f'<span class="task-text {text_class}">{todo["task"]}</span>'
                     st.markdown(task_html, unsafe_allow_html=True) 
