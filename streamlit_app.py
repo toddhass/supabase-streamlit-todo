@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL, ATOMIC QUERY STABILITY
+# streamlit_app.py ← FINAL, API-COMPATIBLE VERSION
 import streamlit as st
 from supabase import create_client
 
@@ -10,7 +10,7 @@ def get_supabase():
 
 supabase = get_supabase()
 
-# 🛑 Load Todos Function (Atomic Query) 🛑
+# 🛑 FINAL FIX: Corrected API arguments for .order() 🛑
 def load_todos(_user_id, status_filter):
     """Loads todos for the current user, applying filter and atomic sorting."""
     
@@ -24,21 +24,27 @@ def load_todos(_user_id, status_filter):
     # 3. Apply Sorting and Execute as a Single Chained Operation
     try:
         return base_query \
-            .order("is_complete", ascending=True) \
-            .order("id", desc=True) \
+            # FIX 1: Sort by completion status. is_complete=False (active) comes before True (completed)
+            # This is ASCENDING order, which is achieved with descending=False
+            .order("is_complete", descending=False) \ 
+            
+            # FIX 2: Sort by ID (newest first). This is DESCENDING order, achieved with descending=True
+            .order("id", descending=True) \ 
+            
             .execute().data
             
     except Exception as e:
+        # A defensive return to prevent the app from crashing entirely
         st.error(f"Failed to load todos (Check Supabase version/connection): {e}")
         return []
 
 
-# --- Handlers ---
+# --- Handlers (Unchanged, retained stability fixes) ---
 def update_todo_status(todo_id, new_status):
     """Handles the change of the toggle status."""
     supabase.table("todos").update({"is_complete": new_status})\
         .eq("id", todo_id).execute()
-    st.rerun() # 🛑 FIX: Explicit rerun after database write
+    st.rerun()
 
 def handle_add_todo(task_to_add):
     """Handles todo insertion logic."""
@@ -51,7 +57,7 @@ def handle_add_todo(task_to_add):
             "task": task_to_add.strip(),
             "is_complete": False
         }).execute()
-        st.rerun() # 🛑 FIX: Explicit rerun after database write
+        st.rerun()
     else:
         pass
         
@@ -59,7 +65,7 @@ def logout():
     """Handles the log out process."""
     supabase.auth.sign_out()
     st.session_state.user = None
-    st.rerun() 
+    st.rerun()
 
 # --- Page Setup ---
 st.set_page_config(page_title="My Todos", page_icon="📝", layout="centered")
@@ -244,7 +250,6 @@ if user:
         
         if submitted:
             handle_add_todo(new_task)
-            # handle_add_todo now calls st.rerun() internally 
             
     # --- View Options / Filter ---
     st.markdown(f"### Your Todos <span class='live'>LIVE</span>", unsafe_allow_html=True)
@@ -262,7 +267,6 @@ if user:
             horizontal=True,
             index=0, # Default to Active Tasks
             label_visibility="hidden",
-            # 🛑 FIX: Removed on_change=st.rerun to avoid redundant reruns/instability
         )
     
     # Load todos based on the user's selected filter
@@ -307,7 +311,7 @@ if user:
                     if st.button("Remove", key=f"del_{todo['id']}", use_container_width=True, type="secondary"):
                         # Instant removal logic
                         supabase.table("todos").delete().eq("id", todo["id"]).execute()
-                        st.rerun() # 🛑 FIX: Explicit rerun after database write
+                        st.rerun() 
                         
                 st.markdown("</div>", unsafe_allow_html=True) 
 
