@@ -79,18 +79,21 @@ def render_todo_item(todo):
     with st.container(border=False):
         st.markdown(f'<div class="{wrapper_class}">', unsafe_allow_html=True)
 
-        # Column structure (Adjusted ratios for better readability)
-        c_checkbox, c_task, c_remove = st.columns([1, 7, 1])  # Widened task column
+        # Column structure (Adjusted for label before checkbox)
+        c_label, c_checkbox, c_task, c_remove = st.columns([1.5, 0.5, 7, 1])  # Added column for label
+        
+        with c_label:
+            st.markdown("Completed:", unsafe_allow_html=True)
         
         with c_checkbox:
-            # Replaced toggle with checkbox for familiar UX
+            # Checkbox with tooltip
             st.checkbox(
                 label="",
                 value=completed,
                 key=f"checkbox_{todo['id']}",
                 on_change=update_todo_status,
                 args=(todo["id"], not completed),
-                help="Mark as completed"  # Added tooltip
+                help="Mark as completed"
             )
 
         with c_task:
