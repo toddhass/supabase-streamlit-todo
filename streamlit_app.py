@@ -1,7 +1,7 @@
-# streamlit_app.py ← FINAL, DUPLICATE-PROOF UI
+# streamlit_app.py ← FINAL, STABLE TOGGLE HANDLER
 import streamlit as st
 from supabase import create_client
-import time
+# Removed time import as sleep is no longer needed
 
 # --- Supabase Client & Function Definitions ---
 @st.cache_resource
@@ -19,14 +19,17 @@ def load_todos(_user_id):
         .order("id", desc=True)\
         .execute().data
 
-# --- Toggle Update Handler ---
+# --- Toggle Update Handler (FIXED: No st.rerun) ---
 def update_todo_status(todo_id, new_status):
     """Handles the change of the toggle status."""
+    # The database update is the only action taken here.
     supabase.table("todos").update({"is_complete": new_status})\
         .eq("id", todo_id).execute()
     st.cache_data.clear()
-    st.rerun() 
-
+    # 🛑 FIX: We rely on the implicit script rerun triggered by the widget interaction
+    # (or the explicit st.rerun() at the end of the form submission) 
+    # to load the updated data, preventing double updates.
+    
 def handle_add_todo(task_to_add):
     """Handles todo insertion logic."""
     if "user" not in st.session_state or not st.session_state.user:
@@ -40,7 +43,6 @@ def handle_add_todo(task_to_add):
         }).execute()
 
         st.cache_data.clear()
-        # st.rerun() will be triggered by the form submission logic
     else:
         pass
 
@@ -173,7 +175,6 @@ if user:
     # --- Add Todo (Using st.form to prevent duplicate submissions) ---
     st.markdown("### Add a new todo")
 
-    # 🛑 FIX: Use st.form with clear_on_submit=True
     with st.form("add_todo_form", clear_on_submit=True):
         col_input, col_btn = st.columns([5, 1])
         
@@ -182,7 +183,7 @@ if user:
                 "What needs to be done?", 
                 placeholder="e.g., Deploy modern UI changes", 
                 label_visibility="collapsed", 
-                key="task_input_in_form" # New key for this input
+                key="task_input_in_form"
             )
         
         with col_btn:
@@ -193,9 +194,8 @@ if user:
             )
         
         if submitted:
-            # Handle submission logic directly here, or call the simplified handler
             handle_add_todo(new_task)
-            st.rerun() # Rerun immediately after adding (Form handles the clearing)
+            st.rerun() # Rerun immediately after adding 
 
     # --- Show Todos (st.toggle Implemented) ---
     st.markdown(f"### Your Todos <span class='live'>LIVE</span>", unsafe_allow_html=True)
@@ -221,6 +221,8 @@ if user:
                         value=completed, 
                         key=f"toggle_{todo['id']}",
                         on_change=update_todo_status,
+                        # The update_todo_status function handles the DB update and cache clear,
+                        # and the script will automatically re-run due to widget interaction.
                         args=(todo["id"], not completed)
                     )
 
@@ -241,8 +243,8 @@ if user:
                 st.markdown("</div>", unsafe_allow_html=True) 
 
     # --- Auto-refresh ---
-    time.sleep(1) 
-    st.rerun()
+    # 🛑 FIX: Removed auto-refresh loop. All reruns are now action-based.
+    pass
 
 else:
     # ----------------------------------------------------
