@@ -1,9 +1,9 @@
+# streamlit_app.py ← FINAL, MODERNIZED, AND USER-FRIENDLY VERSION
 import streamlit as st
 from supabase import create_client
 import time
 
 # --- Supabase Client ---
-# Supabase client is fetched from secrets for security
 @st.cache_resource
 def get_supabase():
     # Ensure SUPABASE_URL and SUPABASE_KEY are in your .streamlit/secrets.toml
@@ -17,13 +17,13 @@ st.set_page_config(page_title="My Todos", page_icon="📝", layout="centered")
 # --- 💅 Modernized CSS for a cleaner, more appealing UI ---
 st.markdown("""
 <style>
-    /* Color Variables for easy theme adjustment */
+    /* Color Variables for easy theme adjustment (Tailwind-inspired) */
     :root {
         --primary-color: #10b981; /* Emerald Green/Teal */
         --secondary-color: #3b82f6; /* Soft Blue */
+        --danger-color: #ef4444; /* Red */
         --bg-light: #f9fafb; /* Subtle off-white for body */
         --card-bg: white;
-        --text-dark: #1f2937;
         --text-muted: #6b7280;
     }
     
@@ -35,7 +35,7 @@ st.markdown("""
         font-size: 4.5rem !important;
         font-weight: 900;
         text-align: center;
-        /* Updated Gradient: Soft Blue to Emerald */
+        /* Updated Gradient */
         background: linear-gradient(90deg, var(--secondary-color) 0%, var(--primary-color) 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -54,7 +54,7 @@ st.markdown("""
         transition: all 0.2s ease-in-out;
     }
 
-    /* Completed State */
+    /* Completed State Styling */
     .completed {
         opacity: 0.85; 
         background: #f1f5f9; /* Subtle light gray */
@@ -79,9 +79,20 @@ st.markdown("""
         margin-left: 10px;
     }
 
-    /* Small hack to vertically align the Add button */
+    /* Button Customization */
     .stButton > button {
         height: 38px; /* Match input height for alignment */
+    }
+
+    /* Custom style for the DELETE button (secondary but red) */
+    .stButton button[kind="secondary"] {
+        border-color: var(--danger-color);
+        color: var(--danger-color);
+    }
+    /* Ensure the "Done" button is the primary green */
+    .stButton button[kind="primary"] {
+        background-color: var(--primary-color); 
+        border-color: var(--primary-color);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -105,14 +116,12 @@ user = st.session_state.user
 if user:
     col1, col2 = st.columns([6,1])
     with col2:
-        # Use a secondary button style for logout
         if st.button("Log out", type="secondary"):
             supabase.auth.sign_out()
             st.session_state.user = None
             st.rerun()
     st.success(f"Logged in as **{user.email}**")
 else:
-    # Use st.tabs for a clean auth flow
     tab1, tab2 = st.tabs(["Log In", "Sign Up"])
 
     with tab1:
@@ -161,7 +170,6 @@ todos = load_todos(user.id)
 # --- Add Todo (Integrated Input) ---
 st.markdown("### Add a new todo")
 with st.container():
-    # Use st.columns for a clean, inline input and button
     col_input, col_btn = st.columns([5, 1])
     
     with col_input:
@@ -173,7 +181,6 @@ with st.container():
         )
     
     with col_btn:
-        # Check if the form is submitted (the button is clicked)
         if st.button("Add", type="primary", use_container_width=True):
             if task.strip():
                 supabase.table("todos").insert({
@@ -181,13 +188,12 @@ with st.container():
                     "task": task.strip(),
                     "is_complete": False
                 }).execute()
-                # Clear the cache and rerun to show the new todo instantly
                 st.cache_data.clear()
                 st.rerun()
             else:
                  st.error("Task cannot be empty.")
 
-# --- Show Todos ---
+# --- Show Todos (Clear Button Labels) ---
 st.markdown(f"### Your Todos <span class='live'>LIVE</span>", unsafe_allow_html=True)
 
 if not todos:
@@ -197,37 +203,39 @@ else:
         completed = todo.get("is_complete", False)
         
         with st.container():
-            # Apply the custom card HTML styling
             st.markdown(f'<div class="todo-card {"completed" if completed else ""}">', unsafe_allow_html=True)
             
-            # Adjusted column ratios for a cleaner look: Task | Toggle Icon | Delete Icon
-            c1, c2, c3 = st.columns([6, 1, 1]) 
+            # Column ratios: Task | Done/Redo Button | Remove Button
+            c1, c2, c3 = st.columns([5, 1.5, 1.5]) 
             
             with c1:
                 # Use the custom CSS class 'task-text' for styling
                 st.markdown(f'<h5 class="task-text">{todo["task"]}</h5>', unsafe_allow_html=True) 
 
             with c2:
-                # Use a specific icon for the toggle action
-                toggle_icon = "check_circle_fill" if completed else "radio_button_unchecked"
-                toggle_help = "Mark incomplete" if completed else "Mark complete"
-                
-                if st.button(toggle_icon, key=f"tog_{todo['id']}", help=toggle_help, use_container_width=True, type="secondary"):
+                # Clear, descriptive text labels for the toggle
+                if completed:
+                    button_label = "Redo" 
+                    button_type = "secondary" # Uses default grey style
+                else:
+                    button_label = "Done"
+                    button_type = "primary" # Uses primary (green) style
+
+                if st.button(button_label, key=f"tog_{todo['id']}", use_container_width=True, type=button_type):
                     supabase.table("todos").update({"is_complete": not completed})\
                         .eq("id", todo["id"]).execute()
                     st.cache_data.clear()
                     st.rerun()
             
             with c3:
-                # Use a specific icon for the delete action
-                if st.button("delete", key=f"del_{todo['id']}", help="Delete todo", use_container_width=True, type="secondary"):
+                # Use "Remove" label, which is styled red via CSS in 'secondary'
+                if st.button("Remove", key=f"del_{todo['id']}", use_container_width=True, type="secondary"):
                     supabase.table("todos").delete().eq("id", todo["id"]).execute()
                     st.cache_data.clear()
                     st.rerun()
                     
             st.markdown("</div>", unsafe_allow_html=True)
 
-# --- Auto-refresh for "Real-Time" feel ---
-# This reruns the script every 3 seconds to fetch the latest data
+# --- Auto-refresh ---
 time.sleep(3)
 st.rerun()
