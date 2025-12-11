@@ -113,4 +113,46 @@ if user:
             row = {
                 "Task": todo["task"],
                 "Completed": st.checkbox("Completed", value=todo["is_complete"], key=f"chk_{todo['id']}", on_change=update_todo_status, args=(todo["id"], not todo["is_complete"])),
-                "Delete": st.button("Delete", key=f"del_{todo['id']}", on_click=delete
+                "Delete": st.button("Delete", key=f"del_{todo['id']}", on_click=delete_todo, args=(todo["id"],))
+            }
+            table_data.append(row)
+        st.table(table_data)
+
+    # Check for data change and rerun
+    if st.session_state.get('data_changed', False):
+        st.session_state['data_changed'] = False
+        st.rerun()
+
+else:
+    # Login/Signup
+    tab1, tab2 = st.tabs(["Log In", "Sign Up"])
+
+    with tab1:
+        with st.form("login_form"):
+            email = st.text_input("Email")
+            password = st.text_input("Password", type="password")
+            if st.form_submit_button("Log In"):
+                try:
+                    response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                    if response.user:
+                        st.session_state.user = response.user
+                        st.success("Logged in!")
+                        st.rerun()
+                except:
+                    st.error("Invalid credentials")
+
+    with tab2:
+        with st.form("signup_form"):
+            email = st.text_input("Email")
+            password = st.text_input("Password", type="password")
+            if st.form_submit_button("Sign Up"):
+                if len(password) < 6:
+                    st.error("Password too short")
+                else:
+                    try:
+                        supabase.auth.sign_up({"email": email, "password": password})
+                        st.success("Check email to confirm")
+                    except:
+                        st.error("Signup failed")
+
+    st.stop()
