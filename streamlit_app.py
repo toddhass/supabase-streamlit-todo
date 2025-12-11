@@ -1,18 +1,18 @@
-# streamlit_app.py ← FINAL, FLAWLESS, REAL-TIME TODO APP (Dec 2025)
+# streamlit_app.py ← FINAL, FLAWLESS, REAL-TIME TODO APP (December 11 2025)
 import streamlit as st
 from supabase import create_client
 import time
 
-# ─── Supabase ─────────────────────
+# Supabase client
 @st.cache_resource
 def get_supabase():
     return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 
 supabase = get_supabase()
 
+# Page config & style
 st.set_page_config(page_title="My Todos", page_icon="Checkmark", layout="centered")
 
-# ─── Styling ─────────────────────
 st.markdown("""
 <style>
     .big-title {font-size:4.5rem!important;font-weight:900;text-align:center;
@@ -28,7 +28,7 @@ st.markdown("""
 st.markdown('<h1 class="big-title">Checkmark My Todos</h1>', unsafe_allow_html=True)
 st.caption("Real-time • Instant sync • Powered by Supabase")
 
-# ─── Auth ─────────────────────
+# Authentication
 if "user" not in st.session_state:
     st.session_state.user = None
 
@@ -51,6 +51,7 @@ if user:
     st.success(f"Logged in as **{user.email}**")
 else:
     tab1, tab2 = st.tabs(["Log In", "Sign Up"])
+
     with tab1:
         with st.form("login"):
             email = st.text_input("Email")
@@ -60,7 +61,8 @@ else:
                     supabase.auth.sign_in_with_password({"email": email, "password": pw})
                     st.rerun()
                 except:
-                    st.error("Wrong email/password")
+                    st.error("Wrong email or password")
+
     with tab2:
         with st.form("signup"):
             email = st.text_input("Email", key="su_email")
@@ -68,4 +70,26 @@ else:
             if st.form_submit_button("Sign Up", type="primary"):
                 try:
                     supabase.auth.sign_up({"email": email, "password": pw})
-                    st.success("Check your
+                    st.success("Check your email to confirm!")
+                    st.balloons()
+                except:
+                    st.error("Sign-up failed")
+
+    st.stop()
+
+# Load todos with short cache (feels real-time)
+@st.cache_data(ttl=2, show_spinner=False)
+def get_todos(_user_id):
+    return supabase.table("todos")\
+        .select("*")\
+        .eq("user_id", _user_id)\
+        .order("id", desc=True)\
+        .execute().data
+
+todos = get_todos(user.id)
+
+# Add todo
+st.markdown("### Checkmark Add a new todo")
+with st.form("add", clear_on_submit=True):
+    task = st.text_area("What needs to be done?", height=100, label_visibility="collapsed")
+    if st.form_submit_button("Add Todo Checkmark", type="primary
