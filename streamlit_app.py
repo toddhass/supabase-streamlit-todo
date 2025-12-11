@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL, NATIVE ST.TOGGLE UI
+# streamlit_app.py ← FINAL, CLEAN UI (NO HEADERS)
 import streamlit as st
 from supabase import create_client
 import time
@@ -49,7 +49,7 @@ def add_todo_callback():
 # --- Page Setup ---
 st.set_page_config(page_title="My Todos", page_icon="📝", layout="centered")
 
-# --- 💅 Custom CSS (Cleaned up for st.toggle) ---
+# --- 💅 Custom CSS (Final styles) ---
 st.markdown("""
 <style>
     :root {
@@ -115,15 +115,6 @@ st.markdown("""
         color: var(--text-muted); 
     }
     
-    /* Header Text Styling */
-    .header-text {
-        font-weight: 700;
-        font-size: 0.9rem;
-        color: #374151;
-        /* Center the "Completed" header text */
-        text-align: center; 
-    }
-
     .live {
         background: var(--primary-color);
         color: white;
@@ -209,20 +200,7 @@ if user:
     # --- Show Todos (st.toggle Implemented) ---
     st.markdown(f"### Your Todos <span class='live'>LIVE</span>", unsafe_allow_html=True)
 
-    # 🛑 HEADER ROW: Labels for the columns
-    with st.container(border=False):
-        st.markdown('<div class="header-row">', unsafe_allow_html=True)
-        # NEW Column ratios: [Toggle + Label size, Task size, Button size]
-        h_toggle, h_task, h_remove = st.columns([1.5, 6.5, 1.5])
-        
-        with h_toggle:
-            st.markdown('<p class="header-text">Completed</p>', unsafe_allow_html=True)
-        with h_task:
-            st.markdown('<p class="header-text">TASK DESCRIPTION</p>', unsafe_allow_html=True)
-        with h_remove:
-            st.markdown('<p class="header-text">ACTIONS</p>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    # -----------------------------------------------------------------
+    # 🛑 HEADER ROW REMOVED 🛑
 
     if not todos:
         st.info("No todos yet — add one above!")
@@ -235,7 +213,7 @@ if user:
             with st.container(border=False):
                 st.markdown(f'<div class="{wrapper_class}">', unsafe_allow_html=True)
 
-                # 1. Use columns matching the header structure
+                # 1. Column structure remains the same for alignment
                 c_toggle, c_task, c_remove = st.columns([1.5, 6.5, 1.5]) 
                 
                 with c_toggle:
