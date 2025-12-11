@@ -1,6 +1,7 @@
 # streamlit_app.py ← UPDATED WITH UI IMPROVEMENTS AND FIXES
 import streamlit as st
 from supabase import create_client
+from streamlit_js_eval import streamlit_js_eval
 
 # --- Supabase Client & Function Definitions ---
 @st.cache_resource
@@ -70,7 +71,7 @@ def logout():
     st.rerun()
 
 # --- Modular Function for Rendering Todo Items ---
-def render_todo_item(todo):
+def render_todo_item(todo, col_ratios):
     """Renders a single todo item with checkbox and delete confirmation."""
     completed = todo.get("is_complete", False)
     
@@ -80,7 +81,7 @@ def render_todo_item(todo):
         st.markdown(f'<div class="{wrapper_class}">', unsafe_allow_html=True)
 
         # Column structure (Adjusted for inline label and checkbox)
-        c_status, c_task, c_remove = st.columns([3, 7, 1])  # Adjusted ratios
+        c_status, c_task, c_remove = st.columns(col_ratios)  # Use dynamic ratios
         
         with c_status:
             sub_label, sub_checkbox = st.columns([2, 1])
@@ -349,6 +350,17 @@ if user:
     # Load todos based on the user's selected filter
     todos = load_todos(user.id, st.session_state.view_filter)
 
+    # --- Dynamic Column Adjustments ---
+    screen_width = streamlit_js_eval(js_expressions="window.innerWidth", want_output=True, key="screen_width")
+
+    # Adjust column ratios dynamically
+    if screen_width > 1024:  # Desktop
+        col_ratios = [4, 6, 1]  # Wider task column
+    elif 768 <= screen_width <= 1024:  # Tablet
+        col_ratios = [3, 7, 1]
+    else:  # Mobile
+        col_ratios = [2, 7, 1]
+
     # --- Show Todos (Modularized Display) ---
     if not todos:
         if st.session_state.view_filter == "Active Tasks":
@@ -359,7 +371,7 @@ if user:
             st.info("No todos yet — add one above!")
     else:
         for todo in todos:
-            render_todo_item(todo)
+            render_todo_item(todo, col_ratios)
 
 else:
     # ----------------------------------------------------
