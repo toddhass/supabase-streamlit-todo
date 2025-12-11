@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL, STABLE VIEW FILTER
+# streamlit_app.py ← FINAL, STABLE VIEW FILTER AND SORTING
 import streamlit as st
 from supabase import create_client
 
@@ -9,21 +9,25 @@ def get_supabase():
 
 supabase = get_supabase()
 
-# 🛑 FIXED load_todos function 🛑
+# 🛑 FINAL STABLE load_todos function 🛑
 @st.cache_data(ttl=2, show_spinner=False)
 def load_todos(_user_id, status_filter):
     """Loads todos for the current user, applying filter and smart sorting."""
     
-    # Start the query by selecting all for the current user
+    # 1. Start the query
     query = supabase.table("todos").select("*").eq("user_id", _user_id)
 
+    # 2. Apply Conditional Filter
     if status_filter == "Active Tasks":
-        # Conditionally apply the filter: only fetch tasks where is_complete is False
         query = query.eq("is_complete", False)
         
-    # Apply Smart Sorting: Uncompleted (False) moves to the top, then by newest
-    # Chaining the order calls ensures the query object is updated correctly.
-    query = query.order("is_complete", ascending=True).order("id", desc=True)
+    # 3. Apply Primary Sort (Completed last)
+    # FIX: Apply the first order and reassign query
+    query = query.order("is_complete", ascending=True)
+
+    # 4. Apply Secondary Sort (Newest first)
+    # FIX: Apply the second order and reassign query
+    query = query.order("id", desc=True)
 
     return query.execute().data
 
@@ -262,7 +266,6 @@ if user:
         )
     
     # Load todos based on the user's selected filter
-    # The cache automatically handles the change in st.session_state.view_filter
     todos = load_todos(user.id, st.session_state.view_filter)
 
     # --- Show Todos (List Display) ---
