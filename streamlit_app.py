@@ -351,12 +351,12 @@ if user:
     todos = load_todos(user.id, st.session_state.view_filter)
 
     # --- Dynamic Column Adjustments ---
-    screen_width = streamlit_js_eval(js_expressions="window.innerWidth", want_output=True, key="screen_width")
+    screen_width = streamlit_js_eval(js_expressions="window.innerWidth", want_output=True, key="screen_width") or 0  # Fallback to 0 if None
 
     # Adjust column ratios dynamically
     if screen_width > 1024:  # Desktop
         col_ratios = [4, 6, 1]  # Wider task column
-    elif 768 <= screen_width <= 1024:  # Tablet
+    elif screen_width >= 768:  # Tablet
         col_ratios = [3, 7, 1]
     else:  # Mobile
         col_ratios = [2, 7, 1]
@@ -416,3 +416,4 @@ else:
                         st.error("Email already exists or invalid.")
 
     st.stop()
+```.")
