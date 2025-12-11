@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL, WITH VIEW OPTIONS
+# streamlit_app.py ← FINAL, STABLE VIEW FILTER
 import streamlit as st
 from supabase import create_client
 
@@ -9,17 +9,20 @@ def get_supabase():
 
 supabase = get_supabase()
 
-# 🛑 Updated load_todos to accept a filter status 🛑
+# 🛑 FIXED load_todos function 🛑
 @st.cache_data(ttl=2, show_spinner=False)
 def load_todos(_user_id, status_filter):
     """Loads todos for the current user, applying filter and smart sorting."""
+    
+    # Start the query by selecting all for the current user
     query = supabase.table("todos").select("*").eq("user_id", _user_id)
 
     if status_filter == "Active Tasks":
-        # Only fetch tasks where is_complete is False
+        # Conditionally apply the filter: only fetch tasks where is_complete is False
         query = query.eq("is_complete", False)
         
-    # Smart Sorting: Uncompleted (False) moves to the top, then by newest
+    # Apply Smart Sorting: Uncompleted (False) moves to the top, then by newest
+    # Chaining the order calls ensures the query object is updated correctly.
     query = query.order("is_complete", ascending=True).order("id", desc=True)
 
     return query.execute().data
@@ -240,7 +243,7 @@ if user:
             handle_add_todo(new_task)
             st.rerun() 
             
-    # --- 🛑 View Options / Filter 🛑 ---
+    # --- View Options / Filter ---
     st.markdown(f"### Your Todos <span class='live'>LIVE</span>", unsafe_allow_html=True)
 
     # Use a container for the filter to keep it visually grouped
@@ -259,11 +262,11 @@ if user:
         )
     
     # Load todos based on the user's selected filter
+    # The cache automatically handles the change in st.session_state.view_filter
     todos = load_todos(user.id, st.session_state.view_filter)
 
     # --- Show Todos (List Display) ---
     if not todos:
-        # Check if the list is empty because of the filter
         if st.session_state.view_filter == "Active Tasks":
             st.info("No active todos! Time to relax, or switch to 'All Tasks' view.")
         else:
