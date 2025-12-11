@@ -1,4 +1,4 @@
-# streamlit_app.py ← FINAL, SELECT ORDER WORKAROUND
+# streamlit_app.py ← FINAL, RPC WORKAROUND FIX
 import streamlit as st
 from supabase import create_client
 
@@ -10,25 +10,22 @@ def get_supabase():
 
 supabase = get_supabase()
 
-# 🛑 FINAL FIX: Inject order parameter into select() 🛑
+# 🛑 FINAL FIX: Using RPC to bypass broken client sorting 🛑
 def load_todos(_user_id, status_filter):
-    """Loads todos for the current user, applying filter and atomic sorting."""
+    """Loads todos for the current user using an RPC to bypass the broken client sorting."""
     
-    # Define the sorting parameters in a single string that PostgREST expects.
-    # Sort: is_complete ASC (false=active first), id DESC (newest first)
-    sort_string = "is_complete.asc,id.desc"
-    
-    # 1. Start the query and apply user ID filter, INJECTING THE SORTING HERE.
-    base_query = supabase.table("todos").select("*", order=sort_string).eq("user_id", _user_id)
+    # We pass the user ID and the filter string directly to the database function.
+    params = {
+        "target_user_id": str(_user_id),
+        "status_filter": status_filter
+    }
 
-    # 2. Apply Conditional Filter
-    if status_filter == "Active Tasks":
-        base_query = base_query.eq("is_complete", False)
-        
-    # 3. Execute the Query.
     try:
-        # The query already contains the sorting via the select() method.
-        return base_query.execute().data
+        # Use rpc() to call the PostgreSQL function 'get_user_todos'.
+        response = supabase.rpc("get_user_todos", params=params).execute()
+        
+        # The result data is contained in the response.data attribute.
+        return response.data
             
     except Exception as e:
         # A defensive return
