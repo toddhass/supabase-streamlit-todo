@@ -75,11 +75,7 @@ def render_todo_item(todo, col_ratios):
     """Renders a single todo item with checkbox and delete confirmation."""
     completed = todo.get("is_complete", False)
     
-    wrapper_class = "todo-card completed-todo" if completed else "todo-card"
-    
-    with st.container(border=False):
-        st.markdown(f'<div class="{wrapper_class}">', unsafe_allow_html=True)
-
+    with st.container():
         # Column structure (Adjusted for inline label and checkbox)
         c_status, c_task, c_remove = st.columns(col_ratios)  # Use dynamic ratios
         
@@ -112,7 +108,9 @@ def render_todo_item(todo, col_ratios):
                     st.session_state[f"confirm_del_{todo['id']}"] = True
                     st.warning("Click again to confirm deletion.")
         
-        st.markdown("</div>", unsafe_allow_html=True)
+        # Marker for completed state
+        if completed:
+            st.markdown('<div class="is-completed"></div>', unsafe_allow_html=True)
 
 # --- Page Setup (Updated to Wide Layout) ---
 st.set_page_config(page_title="My Todos", page_icon="📝", layout="wide")
@@ -141,24 +139,26 @@ st.markdown("""
         margin-bottom: 0.5rem;
     }
 
-    /* Card Styling (Target specific class for todo items) */
-    .todo-card {
+    /* Card Styling for todo items */
+    div[data-testid="stVerticalBlock"]:has([data-testid="stHorizontalBlock"]) {
         background: var(--card-bg);
         margin: 1rem 0;
         border-radius: 12px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
         border-left: 5px solid var(--primary-color);
         transition: all 0.2s ease-in-out;
-        padding: 1rem 1.5rem;  /* Increased padding for breathing room */
-        display: flex;
-        flex-direction: column;
+        padding: 1rem 1.5rem;
     }
     
     /* Completed State Styling */
-    .completed-todo {
+    div[data-testid="stVerticalBlock"]:has(.is-completed) {
         opacity: 0.85; 
         background: #f1f5f9; 
         border-left-color: #94a3b8; 
+    }
+    
+    .is-completed {
+        display: none;
     }
     
     /* Layout Alignment */
@@ -176,7 +176,7 @@ st.markdown("""
         font-weight: 600;
         margin: 0;
         padding: 0;
-        display: inline-block;
+        display: block;
         font-size: 1.1rem;
         line-height: 1.6rem;
     }
@@ -229,9 +229,13 @@ st.markdown("""
         color: var(--primary-color);
     }
 
-    /* Additional CSS for inline alignment */
+    /* Additional CSS for inline alignment and no margins */
     div[data-testid="column"] > div > div > p {
         margin-bottom: 0;  /* Reduce margin for label */
+    }
+    
+    div[data-testid="stVerticalBlock"] p {
+        margin: 0;
     }
 
     /* Media query for desktop screens (min-width: 1024px) */
@@ -246,8 +250,7 @@ st.markdown("""
         div[data-testid="stHorizontalBlock"] {
             gap: 1rem;  /* Add spacing between columns for better visual separation */
         }
-        /* Reduce card padding to fit more content comfortably */
-        .todo-card {
+        div[data-testid="stVerticalBlock"]:has([data-testid="stHorizontalBlock"]) {
             padding: 0.75rem 1rem;
         }
     }
@@ -418,3 +421,4 @@ else:
                         st.error("Email already exists or invalid.")
 
     st.stop()
+```)
